@@ -1,0 +1,50 @@
+{
+  "name": "@syncfusion/ej2-filemanager-node-filesystem",
+  "version": "0.189.0",
+  "description": "Essential JS 2 File Manager Node FileSystem",
+  "author": "Syncfusion Inc.",
+  "license": "SEE LICENSE IN license",
+  "keywords": [
+    "ej2",
+    "syncfusion",
+    "ej2 file manager",
+    "Nodejs",
+    "File system",
+    "File explorer",
+    "File access rule",
+    "File system provider",
+    "Local/physical file storage",
+    "Folders/directory",
+    "file path",
+    "file upload",
+    "File access permission",
+    "file browser",
+    "folder drag and drop"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SyncfusionExamples/ej2-filemanager-node-filesystem"
+  },
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "file-system": "^2.2.2",
+    "gulp": "^4.0.2",
+    "jshint-stylish": "^2.2.1",
+    "multer": "^1.4.1",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "gulp-jshint": "^2.1.0",
+    "jshint": "^2.10.2",
+    "gulp": "^3.9.0",
+    "require-dir": "^0.3.2",
+    "requirejs": "^2.2.0",
+    "shelljs": "^0.7.0"
+  },
+  "scripts": {
+    "test": "gulp lint",
+    "start": "node filesystem-server.js -d C:/Users",
+    "ci-publish": "gulp publish"
+  }
+}
