@@ -26,6 +26,7 @@
     "url": "https://github.com/SyncfusionExamples/ej2-filemanager-node-filesystem"
   },
   "dependencies": {
+    "archiver": "^3.0.0",
     "body-parser": "^1.18.3",
     "express": "^4.16.4",
     "file-system": "^2.2.2",
