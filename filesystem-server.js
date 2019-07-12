@@ -4,6 +4,7 @@ var app = express();
 var size = 0;
 const path = require('path');
 const bodyParser = require("body-parser");
+const archiver = require('archiver');
 const multer = require('multer');
 const fs = require('fs');
 const contentRootPath = process.argv[2] === '-d' ? process.argv[3] : undefined;
@@ -154,7 +155,7 @@ function fileDetails(req, res, filepath) {
             cwd.modified = stats.ctime;
             cwd.created = stats.mtime;
             cwd.type = path.extname(filepath);
-            cwd.location = filepath.substr(filepath.indexOf(":")+ 1, filepath.length -1);
+            cwd.location = filepath.substr(filepath.indexOf(req.body.path), filepath.length - 1);
             resolve(cwd);
         });
     });
@@ -189,9 +190,9 @@ function getSize(size) {
 }
 function getFileDetails(req, res, filterPath) {
     var isNamesAvailable = req.body.names.length > 0 ? true : false;
-    if(req.body.names.length == 0 && req.body.data != 0){
+    if (req.body.names.length == 0 && req.body.data != 0) {
         var nameValues = [];
-        req.body.data.forEach(function(item){
+        req.body.data.forEach(function (item) {
             nameValues.push(item.name);
         });
         req.body.names = nameValues;
@@ -223,17 +224,129 @@ function getFileDetails(req, res, filterPath) {
             data.size = getSize(size);
             size = 0;
             response = { details: data };
-            response.details.location = filterPath.substr(filterPath.indexOf(":")+ 1, filterPath.length - 1);
+            response.details.location = filterPath.substr(filterPath.indexOf(":") + 1, filterPath.length - 1);
             response = JSON.stringify(response);
             res.setHeader('Content-Type', 'application/json');
             res.json(response);
         });
     }
 }
+
+function copyFolder(source, dest) {
+    if (!fs.existsSync(dest)) {
+        fs.mkdirSync(dest);
+    }
+    files = fs.readdirSync(source);
+    files.forEach(function (file) {
+        var curSource = path.join(source, file);
+        if (fs.lstatSync(curSource).isDirectory()) {
+            copyFolder(curSource, path.join(dest, file)); source
+        } else {
+            fs.copyFileSync(path.join(source, file), path.join(dest, file), (err) => {
+                if (err) throw err;
+            });
+        }
+    });
+}
+/**
+ * function copyfile and folder
+ */
+function CopyFiles(req, res, contentRootPath) {
+    var fileList = [];
+    req.body.data.forEach(function (item) {
+        if (item.isFile) {
+            fs.copyFileSync(path.join(contentRootPath + req.body.path + req.path + item.name), path.join(contentRootPath + req.body.targetPath + item.name), (err) => {
+                if (err) throw err;
+            });
+        }
+        else {
+            var fromPath = contentRootPath + req.body.path + req.path + item.name;
+            var toPath = contentRootPath + req.body.targetPath + item.name;
+            copyFolder(fromPath, toPath)
+        }
+        var list = item;
+        list.filterPath = req.body.targetPath;
+        fileList.push(list);
+    });
+    response = { files: fileList };
+    response = JSON.stringify(response);
+    res.setHeader('Content-Type', 'application/json');
+    res.json(response);
+}
+
+function MoveFolder(source, dest) {
+    if (!fs.existsSync(dest)) {
+        fs.mkdirSync(dest);
+    }
+    files = fs.readdirSync(source);
+    files.forEach(function (file) {
+        var curSource = path.join(source, file);
+        if (fs.lstatSync(curSource).isDirectory()) {
+            MoveFolder(curSource, path.join(dest, file));
+            fs.rmdirSync(curSource);
+        } else {
+            fs.copyFileSync(path.join(source, file), path.join(dest, file), (err) => {
+                if (err) throw err;
+            });
+            fs.unlinkSync(path.join(source, file), function (err) {
+                if (err) throw err;
+            });
+        }
+    });
+}
+/**
+ * function move files and folder
+ */
+function MoveFiles(req, res, contentRootPath) {
+    var fileList = [];
+    req.body.data.forEach(function (item) {
+        if (item.isFile) {
+            var source = fs.createReadStream(path.join(contentRootPath + req.body.path + req.path + item.name));
+            var desti = fs.createWriteStream(path.join(contentRootPath + req.body.targetPath + item.name));
+            source.pipe(desti);
+            source.on('end', function () {
+                fs.unlinkSync(path.join(contentRootPath + req.body.path + req.path + item.name), function (err) {
+                    if (err) throw err;
+                });
+            });
+        }
+        else {
+            var fromPath = contentRootPath + req.body.path + req.path + item.name;
+            var toPath = contentRootPath + req.body.targetPath + item.name;
+            MoveFolder(fromPath, toPath);
+            fs.rmdirSync(fromPath);
+        }
+        var list = item;
+        list.filterPath = req.body.targetPath;
+        fileList.push(list);
+    });
+    response = { files: fileList };
+    response = JSON.stringify(response);
+    res.setHeader('Content-Type', 'application/json');
+    res.json(response);
+}
+
+function getRelativePath(rootDirectory, fullPath) {
+    if (rootDirectory.substring(rootDirectory.length - 1) == "/") {
+        if (fullPath.indexOf(rootDirectory) >= 0) {
+            return fullPath.substring(rootDirectory.length - 1);
+        }
+    }
+    else if (fullPath.indexOf(rootDirectory + "/") >= 0) {
+        return "/" + fullPath.substring(rootDirectory.length + 1);
+    }
+}
 /**
  * returns the current working directories
- */ 
+ */
 function FileManagerDirectoryContent(req, res, filepath) {
+    var contentRootPath;
+    if(req.path == "/"){
+        contentRootPath = filepath;
+    }else{
+        contentRootPath = filepath.substring(0, (filepath.indexOf(req.body.path)));
+    }
+     
     return new Promise((resolve, reject) => {
         var cwd = {};
         fs.stat(filepath, function (err, stats) {
@@ -243,7 +356,7 @@ function FileManagerDirectoryContent(req, res, filepath) {
             cwd.dateModified = stats.ctime;
             cwd.dateCreated = stats.mtime;
             cwd.type = path.extname(filepath);
-            cwd.filterPath = '\\' + path.relative(filepath, filepath + req.body.path);
+            cwd.filterPath = req.body.data.length > 0 ? getRelativePath(contentRootPath, contentRootPath + req.body.path.substring(0, req.body.path.indexOf(req.body.data[0].name))) : "";
             if (fs.lstatSync(filepath).isFile()) {
                 cwd.hasChild = false;
                 resolve(cwd);
@@ -251,7 +364,14 @@ function FileManagerDirectoryContent(req, res, filepath) {
         });
         if (fs.lstatSync(filepath).isDirectory()) {
             fs.readdir(filepath, function (err, stats) {
-                cwd.hasChild = stats.length > 0;
+                stats.forEach(stat => {
+                    if(fs.lstatSync(filepath + stat).isDirectory()){
+                        cwd.hasChild = true
+                    }else{
+                        cwd.hasChild = false;
+                    }
+                    if(cwd.hasChild) return;
+                });
                 resolve(cwd);
             });
         }
@@ -314,6 +434,47 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
 });
 
 /**
+ * Download a file or folder
+ */
+app.post('/Download', function (req, res) {
+    var downloadObj = JSON.parse(req.body.downloadInput);
+    if (downloadObj.names.length === 1 && downloadObj.data[0].isFile) {
+        var file = contentRootPath + downloadObj.path + downloadObj.names[0];
+        res.download(file);
+    } else {
+        var archive = archiver('zip', {
+            gzip: true,
+            zlib: { level: 9 } // Sets the compression level.
+        });
+        var output = fs.createWriteStream('./Files.zip');
+        downloadObj.data.forEach(function (item) {
+            archive.on('error', function (err) {
+                throw err;
+            });
+            if (item.isFile) {
+                archive.file(contentRootPath + downloadObj.path + item.name, { name: item.name });
+            }
+            else {
+                archive.directory(contentRootPath + downloadObj.path + item.name + "/", item.name);
+            }
+        });
+        archive.pipe(output);
+        archive.finalize();
+        output.on('close', function () {
+            var stat = fs.statSync(output.path);
+            res.writeHead(200, {
+                'Content-disposition': 'attachment; filename=Files.zip; filename*=UTF-8',
+                'Content-Type': 'APPLICATION/octet-stream',
+                'Content-Length': stat.size
+            });
+            var filestream = fs.createReadStream(output.path);
+            filestream.pipe(res);
+        });
+
+    }
+});
+
+/**
  * Handles the read request
  */
 app.post('/', function (req, res) {
@@ -322,6 +483,14 @@ app.post('/', function (req, res) {
     if (req.body.action == "details") {
         getFileDetails(req, res, contentRootPath + req.body.path);
 
+    }
+    // Action for copying files
+    if (req.body.action == "copy") {
+        CopyFiles(req, res, contentRootPath);
+    }
+    // Action for movinh files
+    if (req.body.action == "move") {
+        MoveFiles(req, res, contentRootPath);
     }
     // Action to create a new folder
     if (req.body.action == "create") {
@@ -359,7 +528,7 @@ app.post('/', function (req, res) {
                 cwd.dateModified = stats.mtime;
                 cwd.dateCreated = stats.ctime;
                 cwd.type = path.extname(filename);
-                cwd.filterPath = filename.substr((contentRootPath.length) , filename.length).replace(files[i],"");
+                cwd.filterPath = filename.substr((contentRootPath.length), filename.length).replace(files[i], "");
                 if (fs.lstatSync(filename).isFile()) {
                     cwd.hasChild = false;
                 }
@@ -401,6 +570,7 @@ app.post('/', function (req, res) {
                     cwd.isFile = cwd.isFile();
                     cwd.dateModified = cwd.ctime;
                     cwd.dateCreated = cwd.mtime;
+                    cwd.filterPath = req.body.data.length > 0 ? getRelativePath(contentRootPath, contentRootPath + req.body.path, req) : "";
                     cwd.type = path.extname(contentRootPath + req.body.path + file);
                     if (fs.lstatSync(file).isDirectory()) {
                         fs.readdirSync(file).forEach(function (items) {

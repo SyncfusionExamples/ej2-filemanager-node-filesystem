@@ -19,9 +19,9 @@ The following actions can be performed with NodeJS file system provider.
 - Delete    - Delete a folder or file.
 - Rename    - Rename a folder or file.
 - Search    - Search a file or folder in NodeJS file system.
-- Copy      - Currently this support is not availabe.
-- Move      - Currently this support is not availabe.
-- Download  - Currently this support is not availabe.
+- Copy      - Copy the selected files or folders to target.
+- Move      - Moves the selected files or folders to target.
+- Download  - Download the selected file or folder.
 
 ## How to configure a web service
 
