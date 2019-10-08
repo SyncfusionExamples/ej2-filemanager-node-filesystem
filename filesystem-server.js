@@ -422,15 +422,9 @@ app.get('/GetImage', function (req, res) {
 /**
  * Handles the upload request
  */
-app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res) {
-    var obj;
-    for (var i = 0; i < fileName.length; i++) {
-        fs.rename('./' + fileName[i], path.join(contentRootPath, req.body.path + fileName[i]), function (err) {
-            if (err) throw err;
-        });
-    }
-    res.send('Success');
-    fileName = [];
+app.post('/Upload', function (req, res) {
+    res.writeHead( 403, "File Manager's upload functionality is restricted in the online demo. If you need to test upload functionality, please install Syncfusion Essential Studio on your machine and run the demo.");
+    res.end( "File Manager's upload functionality is restricted in the online demo. If you need to test upload functionality, please install Syncfusion Essential Studio on your machine and run the demo.");
 });
 
 /**
