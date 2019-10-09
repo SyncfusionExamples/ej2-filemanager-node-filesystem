@@ -2,17 +2,24 @@
 var express = require('express');
 var app = express();
 var size = 0;
+var copyName = "";
+var location = "";
+var isRenameChecking = false;
 const path = require('path');
 const bodyParser = require("body-parser");
 const archiver = require('archiver');
 const multer = require('multer');
 const fs = require('fs');
+var cors = require('cors')
+
 const contentRootPath = process.argv[2] === '-d' ? process.argv[3] : undefined;
 app.use(bodyParser.urlencoded({
     extended: true
 }));
-
 app.use(bodyParser.json());
+app.use(cors());
+
+
 /**
  * Reads text from the file asynchronously and returns a Promise.
  */
@@ -55,9 +62,11 @@ function checkForDuplicates(directory, name, isFile) {
  * function to rename the folder
  */
 function renameFolder(req, res) {
-    var oldDirectoryPath = path.join(contentRootPath + req.body.path, req.body.name);
-    var newDirectoryPath = path.join(contentRootPath + req.body.path, req.body.newName);
-    if (checkForDuplicates(contentRootPath + req.body.path, req.body.newName, req.body.data[0].isFile)) {
+    var oldName = req.body.data[0].name.split("/")[req.body.data[0].name.split("/").length - 1];
+    var newName = req.body.newName.split("/")[req.body.newName.split("/").length - 1];
+    var oldDirectoryPath = path.join(contentRootPath + req.body.data[0].filterPath, oldName);
+    var newDirectoryPath = path.join(contentRootPath + req.body.data[0].filterPath, newName);
+    if (checkForDuplicates(contentRootPath + req.body.data[0].filterPath, newName, req.body.data[0].isFile)) {
         var errorMsg = new Error();
         errorMsg.message = "A file or folder with the name " + req.body.name + " already exists.";
         errorMsg.code = "400";
@@ -69,7 +78,7 @@ function renameFolder(req, res) {
     } else {
         fs.renameSync(oldDirectoryPath, newDirectoryPath);
         (async () => {
-            await FileManagerDirectoryContent(req, res, newDirectoryPath).then(data => {
+            await FileManagerDirectoryContent(req, res, newDirectoryPath + "/").then(data => {
                 response = { files: data };
                 response = JSON.stringify(response);
                 res.setHeader('Content-Type', 'application/json');
@@ -96,18 +105,20 @@ function deleteFolder(req, res) {
         }
     };
     var promiseList = [];
-    for (var i = 0; i < req.body.names.length; i++) {
-        var newDirectoryPath = path.join(contentRootPath + req.body.path, req.body.names[i]);
-
-        promiseList.push(FileManagerDirectoryContent(req, res, newDirectoryPath));
+    for (var i = 0; i < req.body.data.length; i++) {
+        var newDirectoryPath = path.join(contentRootPath + req.body.data[i].filterPath, req.body.data[i].name);
+        if (fs.lstatSync(newDirectoryPath).isFile()) {
+            promiseList.push(FileManagerDirectoryContent(req, res, newDirectoryPath, req.body.data[i].filterPath));
+        } else {
+            promiseList.push(FileManagerDirectoryContent(req, res, newDirectoryPath + "/", req.body.data[i].filterPath));
+        }
     }
     Promise.all(promiseList).then(data => {
         data.forEach(function (files) {
-            if (fs.lstatSync(path.join(contentRootPath + req.body.path, files.name)).isFile()) {
-                fs.unlinkSync(path.join(contentRootPath + req.body.path, files.name));
-
+            if (fs.lstatSync(path.join(contentRootPath + files.filterPath, files.name)).isFile()) {
+                fs.unlinkSync(path.join(contentRootPath + files.filterPath, files.name));
             } else {
-                deleteFolderRecursive(path.join(contentRootPath + req.body.path, files.name));
+                deleteFolderRecursive(path.join(contentRootPath + files.filterPath, files.name));
             }
         });
         response = { files: data };
@@ -188,7 +199,28 @@ function getSize(size) {
     else hz = (size / 1024 / 1024 / 1024).toFixed(2) + ' GB';
     return hz;
 }
-function getFileDetails(req, res, filterPath) {
+
+function checkForMultipleLocations(req, contentRootPath){
+    var previousLocation = "";
+    var isMultipleLocation = false;
+    req.body.data.forEach(function(item){
+        if (previousLocation == "") {
+            previousLocation = item.filterPath;
+            location =item.filterPath;
+        } else if (previousLocation == item.filterPath && !isMultipleLocation) {
+            isMultipleLocation = false;
+            location = item.filterPath;
+        } else {
+            isMultipleLocation = true;
+            location = "Various Location";
+        }
+    });
+    if(!isMultipleLocation){
+        location = contentRootPath.split("/")[contentRootPath.split("/").length - 1] + location.substr(0, location.length - 2);
+    }
+    return isMultipleLocation;
+}
+function getFileDetails(req, res, filterPath, contentRootPath) {
     var isNamesAvailable = req.body.names.length > 0 ? true : false;
     if (req.body.names.length == 0 && req.body.data != 0) {
         var nameValues = [];
@@ -204,12 +236,23 @@ function getFileDetails(req, res, filterPath) {
                 data.size = getSize(size);
                 size = 0;
             }
+            var RootIndex = data.location.indexOf(contentRootPath.split("/")[contentRootPath.split("/").length - 1]);
+            if (RootIndex < 0) {
+                data.location = contentRootPath.split("/")[contentRootPath.split("/").length - 1] + data.location;
+            } else {
+                data.location = data.location.substr(RootIndex, data.location.length - 1);
+            }
+            if (!isNamesAvailable) {
+                data.location = data.location.substr(0, data.location.length - 1);
+            }
             response = { details: data };
             response = JSON.stringify(response);
             res.setHeader('Content-Type', 'application/json');
             res.json(response);
         });
     } else {
+        var isMultipleLocations = false;
+        isMultipleLocations = checkForMultipleLocations(req, contentRootPath);
         req.body.names.forEach(function (item) {
             if (fs.lstatSync(filterPath + item).isDirectory()) {
                 getFolderSize(req, res, filterPath + item, size);
@@ -219,14 +262,25 @@ function getFileDetails(req, res, filterPath) {
             }
         });
         fileDetails(req, res, filterPath + req.body.names[0]).then(data => {
-            data.name = req.body.names.join(", ");
+            var names = [];
+            req.body.names.forEach(function (name) {
+                if (name.split("/").length > 0) {
+                    names.push(name.split("/")[name.split("/").length - 1]);
+                }
+                else {
+                    names.push(name);
+                }
+            });
+            data.name = names.join(", ");
             data.multipleFiles = true;
             data.size = getSize(size);
             size = 0;
             response = { details: data };
-            response.details.location = filterPath.substr(filterPath.indexOf(":") + 1, filterPath.length - 1);
+            response.details.location = location;
             response = JSON.stringify(response);
             res.setHeader('Content-Type', 'application/json');
+            isMultipleLocations = false;
+            location = "";
             res.json(response);
         });
     }
@@ -248,30 +302,82 @@ function copyFolder(source, dest) {
         }
     });
 }
+
+function updateCopyName(path, name, count, isFile) {
+    var subName = "", extension = "";
+    if (isFile) {
+        extension = name.substr(name.lastIndexOf('.'), name.length - 1);
+        subName = name.substr(0, name.lastIndexOf('.'));
+    }
+    copyName = !isFile ? name + "(" + count + ")" : (subName + "(" + count + ")" + extension);
+    if (checkForDuplicates(path, copyName, isFile)) {
+        count = count + 1;
+        updateCopyName(path, name, count, isFile);
+    }
+}
+
+function checkForFileUpdate(fromPath, toPath, item, contentRootPath, req) {
+    var count = 1;
+    var name = copyName = item.name;
+    if (fromPath == toPath) {
+        if (checkForDuplicates(contentRootPath + req.body.targetPath, name, item.isFile)) {
+            updateCopyName(contentRootPath + req.body.targetPath, name, count, item.isFile);
+        }
+    } else {
+        if (req.body.renameFiles.length > 0 && req.body.renameFiles.indexOf(item.name) >= 0) {
+            updateCopyName(contentRootPath + req.body.targetPath, name, count, item.isFile);
+        } else {
+            if (checkForDuplicates(contentRootPath + req.body.targetPath, name, item.isFile)) {
+                isRenameChecking = true;
+            }
+        }
+    }
+}
 /**
  * function copyfile and folder
  */
 function CopyFiles(req, res, contentRootPath) {
     var fileList = [];
+    var replaceFileList = [];
     req.body.data.forEach(function (item) {
-        if (item.isFile) {
-            fs.copyFileSync(path.join(contentRootPath + req.body.path + req.path + item.name), path.join(contentRootPath + req.body.targetPath + item.name), (err) => {
-                if (err) throw err;
-            });
+        var fromPath = contentRootPath + item.filterPath + item.name;
+        var toPath = contentRootPath + req.body.targetPath + item.name;
+        checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
+        if (!isRenameChecking) {
+            toPath = contentRootPath + req.body.targetPath + copyName;
+            if (item.isFile) {
+                fs.copyFileSync(path.join(fromPath), path.join(toPath), (err) => {
+                    if (err) throw err;
+                });
+            }
+            else {
+                copyFolder(fromPath, toPath)
+            }
+            var list = item;
+            list.filterPath = req.body.targetPath;
+            list.name = copyName;
+            fileList.push(list);
+        } else {
+            replaceFileList.push(item.name);
         }
-        else {
-            var fromPath = contentRootPath + req.body.path + req.path + item.name;
-            var toPath = contentRootPath + req.body.targetPath + item.name;
-            copyFolder(fromPath, toPath)
-        }
-        var list = item;
-        list.filterPath = req.body.targetPath;
-        fileList.push(list);
     });
-    response = { files: fileList };
-    response = JSON.stringify(response);
-    res.setHeader('Content-Type', 'application/json');
-    res.json(response);
+    if (replaceFileList.length == 0) {
+        copyName = "";
+        response = { files: fileList };
+        response = JSON.stringify(response);
+        res.setHeader('Content-Type', 'application/json');
+        res.json(response);
+    } else {
+        isRenameChecking = false;
+        var errorMsg = new Error();
+        errorMsg.message = "File Already Exists.";
+        errorMsg.code = "400";
+        errorMsg.fileExists = replaceFileList;
+        response = { error: errorMsg, files: [] };
+        response = JSON.stringify(response);
+        res.setHeader('Content-Type', 'application/json');
+        res.json(response);
+    }
 }
 
 function MoveFolder(source, dest) {
@@ -299,31 +405,53 @@ function MoveFolder(source, dest) {
  */
 function MoveFiles(req, res, contentRootPath) {
     var fileList = [];
+    var replaceFileList = [];
     req.body.data.forEach(function (item) {
-        if (item.isFile) {
-            var source = fs.createReadStream(path.join(contentRootPath + req.body.path + req.path + item.name));
-            var desti = fs.createWriteStream(path.join(contentRootPath + req.body.targetPath + item.name));
-            source.pipe(desti);
-            source.on('end', function () {
-                fs.unlinkSync(path.join(contentRootPath + req.body.path + req.path + item.name), function (err) {
-                    if (err) throw err;
+        var fromPath = contentRootPath + item.filterPath + item.name;
+        var toPath = contentRootPath + req.body.targetPath + item.name;
+        checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
+        if (!isRenameChecking) {
+            toPath = contentRootPath + req.body.targetPath + copyName;
+            if (item.isFile) {
+                var source = fs.createReadStream(path.join(fromPath));
+                var desti = fs.createWriteStream(path.join(toPath));
+                source.pipe(desti);
+                source.on('end', function () {
+                    fs.unlinkSync(path.join(fromPath), function (err) {
+                        if (err) throw err;
+                    });
                 });
-            });
+            }
+            else {
+                MoveFolder(fromPath, toPath);
+                fs.rmdirSync(fromPath);
+            }
+            var list = item;
+            list.name = copyName;
+            list.filterPath = req.body.targetPath;
+            fileList.push(list);
+        } else {
+            replaceFileList.push(item.name);
         }
-        else {
-            var fromPath = contentRootPath + req.body.path + req.path + item.name;
-            var toPath = contentRootPath + req.body.targetPath + item.name;
-            MoveFolder(fromPath, toPath);
-            fs.rmdirSync(fromPath);
-        }
-        var list = item;
-        list.filterPath = req.body.targetPath;
-        fileList.push(list);
     });
-    response = { files: fileList };
-    response = JSON.stringify(response);
-    res.setHeader('Content-Type', 'application/json');
-    res.json(response);
+    if (replaceFileList.length == 0) {
+        copyName = "";
+        response = { files: fileList };
+        response = JSON.stringify(response);
+        res.setHeader('Content-Type', 'application/json');
+        res.json(response);
+    }
+    else {
+        isRenameChecking = false;
+        var errorMsg = new Error();
+        errorMsg.message = "File Already Exists.";
+        errorMsg.code = "400";
+        errorMsg.fileExists = replaceFileList;
+        response = { error: errorMsg, files: [] };
+        response = JSON.stringify(response);
+        res.setHeader('Content-Type', 'application/json');
+        res.json(response);
+    }
 }
 
 function getRelativePath(rootDirectory, fullPath) {
@@ -335,18 +463,14 @@ function getRelativePath(rootDirectory, fullPath) {
     else if (fullPath.indexOf(rootDirectory + "/") >= 0) {
         return "/" + fullPath.substring(rootDirectory.length + 1);
     }
+    else {
+        return "";
+    }
 }
 /**
  * returns the current working directories
  */
-function FileManagerDirectoryContent(req, res, filepath) {
-    var contentRootPath;
-    if(req.path == "/"){
-        contentRootPath = filepath;
-    }else{
-        contentRootPath = filepath.substring(0, (filepath.indexOf(req.body.path)));
-    }
-     
+function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
     return new Promise((resolve, reject) => {
         var cwd = {};
         fs.stat(filepath, function (err, stats) {
@@ -356,7 +480,11 @@ function FileManagerDirectoryContent(req, res, filepath) {
             cwd.dateModified = stats.ctime;
             cwd.dateCreated = stats.mtime;
             cwd.type = path.extname(filepath);
-            cwd.filterPath = req.body.data.length > 0 ? getRelativePath(contentRootPath, contentRootPath + req.body.path.substring(0, req.body.path.indexOf(req.body.data[0].name))) : "";
+            if (searchFilterPath) {
+                cwd.filterPath = searchFilterPath;
+            } else {
+                cwd.filterPath = req.body.data.length > 0 ? getRelativePath(contentRootPath, contentRootPath + req.body.path.substring(0, req.body.path.indexOf(req.body.data[0].name))) : "";
+            }
             if (fs.lstatSync(filepath).isFile()) {
                 cwd.hasChild = false;
                 resolve(cwd);
@@ -365,12 +493,12 @@ function FileManagerDirectoryContent(req, res, filepath) {
         if (fs.lstatSync(filepath).isDirectory()) {
             fs.readdir(filepath, function (err, stats) {
                 stats.forEach(stat => {
-                    if(fs.lstatSync(filepath + stat).isDirectory()){
+                    if (fs.lstatSync(filepath + stat).isDirectory()) {
                         cwd.hasChild = true
-                    }else{
+                    } else {
                         cwd.hasChild = false;
                     }
-                    if(cwd.hasChild) return;
+                    if (cwd.hasChild) return;
                 });
                 resolve(cwd);
             });
@@ -406,7 +534,7 @@ const multerConfig = {
  * Gets the imageUrl from the client
  */
 app.get('/GetImage', function (req, res) {
-    var image = req.query.path;
+    var image = req.query.path.split("/").length > 1 ? req.query.path : "/" + req.query.path;
     fs.readFile(contentRootPath + image, function (err, content) {
         if (err) {
             res.writeHead(400, { 'Content-type': 'text/html' });
@@ -452,10 +580,10 @@ app.post('/Download', function (req, res) {
                 throw err;
             });
             if (item.isFile) {
-                archive.file(contentRootPath + downloadObj.path + item.name, { name: item.name });
+                archive.file(contentRootPath + item.filterPath + item.name, { name: item.name });
             }
             else {
-                archive.directory(contentRootPath + downloadObj.path + item.name + "/", item.name);
+                archive.directory(contentRootPath + item.filterPath + item.name + "/", item.name);
             }
         });
         archive.pipe(output);
@@ -470,7 +598,6 @@ app.post('/Download', function (req, res) {
             var filestream = fs.createReadStream(output.path);
             filestream.pipe(res);
         });
-
     }
 });
 
@@ -481,8 +608,7 @@ app.post('/', function (req, res) {
     req.setTimeout(0);
     // Action for getDetails
     if (req.body.action == "details") {
-        getFileDetails(req, res, contentRootPath + req.body.path);
-
+        getFileDetails(req, res, contentRootPath + req.body.path, contentRootPath);
     }
     // Action for copying files
     if (req.body.action == "copy") {
@@ -495,20 +621,55 @@ app.post('/', function (req, res) {
     // Action to create a new folder
     if (req.body.action == "create") {
         createFolder(req, res, contentRootPath + req.body.path);
-
     }
     // Action to remove a file
     if (req.body.action == "delete") {
         deleteFolder(req, res, contentRootPath + req.body.path);
-
     }
     // Action to rename a file
     if (req.body.action === "rename") {
         renameFolder(req, res, contentRootPath + req.body.path);
-
     }
 
-    function fromDir(startPath, filter, contentRootPath) {
+    function addSearchList(filename, contentRootPath, fileList, files, index) {
+        var cwd = {};
+        var stats = fs.statSync(filename);
+        cwd.name = path.basename(filename);
+        cwd.size = stats.size;
+        cwd.isFile = stats.isFile();
+        cwd.dateModified = stats.mtime;
+        cwd.dateCreated = stats.ctime;
+        cwd.type = path.extname(filename);
+        cwd.filterPath = filename.substr((contentRootPath.length), filename.length).replace(files[index], "");
+        if (fs.lstatSync(filename).isFile()) {
+            cwd.hasChild = false;
+        }
+        if (fs.lstatSync(filename).isDirectory()) {
+            var statsRead = fs.readdirSync(filename);
+            cwd.hasChild = statsRead.length > 0;
+        }
+        fileList.push(cwd);
+    }
+
+    function checkForSearchResult(casesensitive, filter, isFile, fileName, searchString) {
+        var isAddable = false;
+        if (searchString.substr(0, 1) == "*" && searchString.substr(searchString.length - 1, 1) == "*") {
+            if (casesensitive ? fileName.indexOf(filter) >= 0 : (fileName.indexOf(filter.toLowerCase()) >= 0 || fileName.indexOf(filter.toUpperCase()) >= 0)) {
+                isAddable = true
+            }
+        } else if (searchString.substr(searchString.length - 1, 1) == "*") {
+            if (casesensitive ? fileName.startsWith(filter) : (fileName.startsWith(filter.toLowerCase())|| fileName.startsWith(filter.toUpperCase()))) {
+                isAddable = true
+            }
+        } else {
+            if (casesensitive ? fileName.endsWith(filter) : (fileName.endsWith(filter.toLowerCase()) || fileName.endsWith(filter.toUpperCase()))) {
+                isAddable = true
+            }
+        }
+        return isAddable;
+    }
+
+    function fromDir(startPath, filter, contentRootPath, casesensitive, searchString) {
         if (!fs.existsSync(startPath)) {
             return;
         }
@@ -517,27 +678,13 @@ app.post('/', function (req, res) {
             var filename = path.join(startPath, files[i]);
             var stat = fs.lstatSync(filename);
             if (stat.isDirectory()) {
-                fromDir(filename, filter, contentRootPath); //recurse
+                if (checkForSearchResult(casesensitive, filter, false, files[i], searchString)) {
+                    addSearchList(filename, contentRootPath, fileList, files, i);
+                }
+                fromDir(filename, filter, contentRootPath, casesensitive, searchString); //recurse
             }
-            else if (files[i].indexOf(filter) >= 0) {
-                var cwd = {};
-                var stats = fs.statSync(filename);
-                cwd.name = path.basename(filename);
-                cwd.size = stats.size;
-                cwd.isFile = stats.isFile();
-                cwd.dateModified = stats.mtime;
-                cwd.dateCreated = stats.ctime;
-                cwd.type = path.extname(filename);
-                cwd.filterPath = filename.substr((contentRootPath.length), filename.length).replace(files[i], "");
-                if (fs.lstatSync(filename).isFile()) {
-                    cwd.hasChild = false;
-                }
-                if (fs.lstatSync(filename).isDirectory()) {
-                    var statsRead = fs.readdirSync(filename);
-                    cwd.hasChild = statsRead.length > 0;
-                }
-                fileList.push(cwd);
-
+            else if (checkForSearchResult(casesensitive, filter, true, files[i], searchString)) {
+                addSearchList(filename, contentRootPath, fileList, files, i);
             }
         }
     }
@@ -545,8 +692,7 @@ app.post('/', function (req, res) {
     // Action to search a file
     if (req.body.action === 'search') {
         var fileList = [];
-
-        fromDir(contentRootPath + req.body.path, req.body.searchString.replace(/\*/g, ""), contentRootPath);
+        fromDir(contentRootPath + req.body.path, req.body.searchString.replace(/\*/g, ""), contentRootPath, req.body.caseSensitive, req.body.searchString);
         (async () => {
             const tes = await FileManagerDirectoryContent(req, res, contentRootPath + req.body.path);
             response = { cwd: tes, files: fileList };
@@ -570,7 +716,7 @@ app.post('/', function (req, res) {
                     cwd.isFile = cwd.isFile();
                     cwd.dateModified = cwd.ctime;
                     cwd.dateCreated = cwd.mtime;
-                    cwd.filterPath = req.body.data.length > 0 ? getRelativePath(contentRootPath, contentRootPath + req.body.path, req) : "";
+                    cwd.filterPath = getRelativePath(contentRootPath, contentRootPath + req.body.path, req);
                     cwd.type = path.extname(contentRootPath + req.body.path + file);
                     if (fs.lstatSync(file).isDirectory()) {
                         fs.readdirSync(file).forEach(function (items) {
@@ -612,7 +758,6 @@ app.post('/', function (req, res) {
                 res.setHeader('Content-Type', 'application/json');
                 res.json(response);
             });
-
         })();
     }
 
