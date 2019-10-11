@@ -10,18 +10,19 @@ NodeJs File System Provider Serves the file system providers support for the  Fi
 
 The following actions can be performed with NodeJS file system provider.
 
-- Read      - Read the files from NodeJS file system.
-- Details   - Gets a file's details which is Type, Size, Location and Modified date.
-- Upload    - Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics:
-                - Maximum file size:  30MB
-                - Accepted Media MIME types: */*
-- Create    - Create a New Folder.
-- Delete    - Delete a folder or file.
-- Rename    - Rename a folder or file.
-- Search    - Search a file or folder in NodeJS file system.
-- Copy      - Copy the selected files or folders to target.
-- Move      - Moves the selected files or folders to target.
-- Download  - Download the selected file or folder.
+| **Actions** | **Description** |
+| --- | --- |
+| Read      | Read the files from NodeJS file system. |
+| Details   | Gets a file's details which consists of Type, Size, Location and Modified date. |
+| Download  | Downloads the selected file or folder from NodeJS file system. |
+| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*` </li></ul> |
+| Create    | Creates a New folder. |
+| Delete    | Deletes a folder or file. |
+| Copy      | Copys the selected files or folders from target. |
+| Move      | Moves the files or folders to the desired location. |
+| Rename    | Renames a folder or file. |
+| Search    | Full-text queries perform linguistic searches against text data in full-text indexes by operating on words and phrases. |
+
 
 ## How to configure a web service
 
