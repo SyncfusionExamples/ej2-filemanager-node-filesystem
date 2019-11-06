@@ -1,31 +1,28 @@
 /*jshint esversion: 8 */
 var express = require('express');
-var app = express();
-var size = 0;
-var copyName = "";
-var location = "";
-var isRenameChecking = false;
-var accessDetails = null;
 const path = require('path');
 const bodyParser = require("body-parser");
 const archiver = require('archiver');
 const multer = require('multer');
 const fs = require('fs');
 var cors = require('cors')
-
-const contentRootPath = process.argv[2] === '-d' ? process.argv[3] : undefined;
-var rootName;
+var app = express();
 app.use(bodyParser.urlencoded({
     extended: true
 }));
 app.use(bodyParser.json());
 app.use(cors());
-
+const contentRootPath = process.argv[2] === '-d' ? process.argv[3] : undefined;
+var size = 0;
+var copyName = "";
+var location = "";
+var isRenameChecking = false;
+var accessDetails = null;
+var rootName;
 var Permission = {
     Allow: "allow",
     Deny: "deny"
 };
-
 class AccessDetails {
     constructor(role, rules) {
         this.role = role;
