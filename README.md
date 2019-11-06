@@ -2,7 +2,7 @@
 
 This repository contains the nodeJS file system provider used for Essential JS 2 File Manager component.
 
-## Key features
+## Key Features
 
 The Node.js file system provider module allows you to work with the physical file system. It also provides the methods for performing various file actions like creating a new folder, renaming files, and deleting files.
 
