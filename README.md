@@ -2,7 +2,7 @@
 
 This repository contains the nodeJS file system provider used for Essential JS 2 File Manager component.
 
-## Key features
+## Key Features
 
 The Node.js file system provider module allows you to work with the physical file system. It also provides the methods for performing various file actions like creating a new folder, renaming files, and deleting files.
 
@@ -15,7 +15,9 @@ The following actions can be performed with NodeJS file system provider.
 | Read      | Reads the files from NodeJS file system. |
 | Details   | Gets the file's details which consists of Type, Size, Location and Modified date. |
 | Download  | Downloads the selected file or folder from NodeJS file system. |
-| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*` </li></ul> |
+| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics:
+                  - Maximum file size:  30MB
+                - Accepted Media MIME types: */*
 | Create    | Creates a New folder. |
 | Delete    | Deletes a folder or file. |
 | Copy      | Copys the selected files or folders from target. |
@@ -71,7 +73,7 @@ Follow the below set of commands to configure the nodeJS file system providers.
 
 ```
 
-- To install the depend packages for the file system provider, navigate to @syncfusion/ej2-filemanager-node-filesystem folder within the node_modules and run the following command. 
+- To install the depend packages for the file system provider, navigate to @syncfusion/ej2-filemanager-node-filesystem folder within the node_modules and run the below command 
 
 ```sh
  
@@ -79,15 +81,15 @@ Follow the below set of commands to configure the nodeJS file system providers.
 
 ```
 
-* Now, run the following command line to check the Node API service in local and will be started in `http://localhost:8090/`. By default, the nodeJS directory service is configured with `C:/Users`. 
+* Now, run the below command line to check the Node API service in local and will be started in `http://localhost:8090/`. By default the nodeJS directory service is configured with `C:/Users`. 
 
 ### To configure the directory
 
-* To change the directory, use flag `-d` like this `-d D:/Projects`
+* To change the directory use flag `-d` like this `-d D:/Projects`
  
 ### To configure the port
 
-* To change the port, use like this `set PORT=3000`
+* To change the port use like this `set PORT=3000`
 
 For example: 
 
@@ -97,7 +99,7 @@ set PORT=3000 && node filesystem-server.js -d D:/Projects
 
 ### start the service
 
-To start the service, use this command.
+To start the service use this command,
 
 ```sh
 npm start
@@ -158,18 +160,18 @@ The FileManager will be rendered as follows.
 
 ## Support
 
-Product support is available through following mediums:
+Product support is available for through following mediums.
 
 * Creating incident in Syncfusion [Direct-trac](https://www.syncfusion.com/support/directtrac/incidents?utm_source=npm&utm_campaign=filemanager) support system or [Community forum](https://www.syncfusion.com/forums/essential-js2?utm_source=npm&utm_campaign=filemanager).
 * New [GitHub issue](https://github.com/syncfusion/ej2-javascript-ui-controls/issues/new).
-* Ask your questions in [Stack Overflow](https://stackoverflow.com/?utm_source=npm&utm_campaign=filemanager) with tag `syncfusion` and `ej2`.
+* Ask your query in [Stack Overflow](https://stackoverflow.com/?utm_source=npm&utm_campaign=filemanager) with tag `syncfusion` and `ej2`.
 
 ## License
 
-Check the license details [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/license).
+Check the license detail [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/license).
 
 ## Changelog
 
-Check the changelog [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/controls/filemanager/CHANGELOG.md).
+Check the changelog [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/controls/filemanager/CHANGELOG.md)
 
 © Copyright 2019 Syncfusion, Inc. All Rights Reserved. The Syncfusion Essential Studio license and copyright applies to this distribution.
