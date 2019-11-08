@@ -4,7 +4,7 @@ This repository contains the nodeJS file system provider used for Essential JS 2
 
 ## Key Features
 
-The Node.js file system provider module allows you to work with the physical file system. It also provides the methods for performing various file actions like creating a new folder, renaming files and deleting files.
+The Node.js file system provider module allows you to work with the physical file system. It also provides the methods for performing various file actions like creating a new folder, renaming files, and deleting files.
 
 NodeJs File System Provider Serves the file system providers support for the  FileManager component with the NodeJS.
 
@@ -12,16 +12,53 @@ The following actions can be performed with NodeJS file system provider.
 
 | **Actions** | **Description** |
 | --- | --- |
-| Read      | Read the files from NodeJS file system. |
-| Details   | Gets a file's details which consists of Type, Size, Location and Modified date. |
+| Read      | Reads the files from NodeJS file system. |
+| Details   | Gets the file's details which consists of Type, Size, Location and Modified date. |
 | Download  | Downloads the selected file or folder from NodeJS file system. |
-| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*` </li></ul> |
+| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics:
+                  - Maximum file size:  30MB
+                - Accepted Media MIME types: */*
 | Create    | Creates a New folder. |
 | Delete    | Deletes a folder or file. |
 | Copy      | Copys the selected files or folders from target. |
 | Move      | Moves the files or folders to the desired location. |
 | Rename    | Renames a folder or file. |
-| Search    | Full-text queries perform linguistic searches against text data in full-text indexes by operating on words and phrases. |
+| Search    | Full-text questions perform linguistic searches against text data in full-text indexes by operating on words and phrases. |
+
+## Access Control
+
+The EJ2 FileManager allows you to define access permissions for files and folders using a set of access rules to user(s). The rules and roles should be specified in the `accessRules.json` available in the root folder of the package. The following table represents the access rule properties available for the files and folders.
+
+| **Properties** | **Description** |
+| --- | --- |
+| Read          | Allows access to read a file or folder. |
+| Write         | Allows permission to edit a file or folder. |
+| WriteContents | Allows permission to edit the content of folder. |
+| Copy          | Allows permission to copy a file or folder. |
+| Download      | Allows permission to download a file or folder. |
+| Upload        | Allows permission to upload into the folder. |
+| IsFile        | Specifies whether the rule is specified for folder or file. |
+| Role          | Specifies the role to which the rule is applied. |
+| Path          | Specifies the path to apply the rules which are defined. |
+
+For example
+```sh
+{
+    "role": "administrator",
+    "rules":[
+        //Denies downloading the 'Videos' folder.
+        {"path":"/Videos/", "isFile": false,"role": "administrator", "download": "deny", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow"},
+        //Denies uploading files in all folders under 'Pictures' by displaying a custom access denied message.
+        {"path":"/Pictures/*","isFile": false, "role": "administrator","download": "allow", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"deny","message":"you don't have permission for this, Contact administrator for access."  },
+        //Denies deleting and renaming all files in 'Downloads' folder.
+        {"path":"/Downloads/*.*","isFile":true, "role": "administrator","download": "allow", "read":"allow", "write": "deny",  "copy": "allow", "writeContents": "allow", "upload":"allow" },
+        //Denies opening all 'png' files in 'Employees' folder.
+        {"path":"/Pictures/Employees/*.png","isFile":true, "role": "administrator","download": "allow", "read":"deny", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow" },
+        //Denies downloading all files with name 'FileManager' in 'Documents' folder.
+        {"path":"/Documents/FileManager.*","isFile":true, "role": "administrator", "download": "deny", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow", "message":"you don't have permission for this, Contact administrator for access."  },
+    ]
+}
+```
 
 
 ## How to configure a web service
@@ -67,6 +104,59 @@ To start the service use this command,
 ```sh
 npm start
 ```
+
+## File Manager AjaxSettings
+
+To access the basic actions like Read, Delete, Copy, Move, Rename, Search, and Get Details of File Manager using NodeJS file system service, just map the following code snippet in the Ajaxsettings property of File Manager.
+
+Here, the `hostUrl` will be your locally hosted port number.
+
+```
+  var hostUrl = http://localhost:8090/;
+        ajaxSettings: {
+            url: hostUrl,
+        }
+```
+
+## File download AjaxSettings
+
+To perform download operation, initialize the `downloadUrl` property in ajaxSettings of the File Manager component.
+
+```
+  var hostUrl = http://localhost:8090/;
+  ajaxSettings: {
+            url: hostUrl,
+            downloadUrl: hostUrl + 'Download'
+        },
+```
+
+## File upload AjaxSettings
+
+To perform upload operation, initialize the `uploadUrl` property in ajaxSettings of the File Manager component.
+
+```
+  var hostUrl = http://localhost:8090/;
+  ajaxSettings: {
+            url: hostUrl,
+            uploadUrl: hostUrl + 'Upload'
+        },
+```
+
+## File image preview AjaxSettings
+
+To perform image preview support in the File Manager component, initialize the `getImageUrl` property in ajaxSettings of the File Manager component.
+
+```
+  var hostUrl = http://localhost:8090/;
+  ajaxSettings: {
+            url: hostUrl,
+            getImageUrl: hostUrl + 'GetImage'
+        },
+```
+
+The FileManager will be rendered as follows.
+
+![File Manager](https://ej2.syncfusion.com/products/images/file-manager/readme.gif)
 
 ## Support
 

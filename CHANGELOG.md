@@ -1,12 +1,21 @@
 # Changelog
 
-## 17.3.14 (2019-10-04)
+## 17.3.26 (2019-11-05)
+
+### NodeJS File System Provider
+
+#### New Features
+
+- Access control support has been included.
+
+## 17.2.34 (2019-10-03)
 
 ### NodeJS File System Provider
 
 #### Bug fixes
 
 - Issues with getting the details and searching the files or folders have been fixed.
+
 - Existing and replacing dialog will now be shown on copying or moving the files or folders.
 
 ## 17.2.34 (2019-07-12)
