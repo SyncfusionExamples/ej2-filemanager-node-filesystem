@@ -1,6 +1,6 @@
 {
   "name": "@syncfusion/ej2-filemanager-node-filesystem",
-  "version": "17.3.14",
+  "version": "17.4.39",
   "description": "Essential JS 2 File Manager Node FileSystem",
   "author": "Syncfusion Inc.",
   "license": "SEE LICENSE IN license",
@@ -34,7 +34,8 @@
     "gulp": "^4.0.2",
     "jshint-stylish": "^2.2.1",
     "multer": "^1.4.1",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "yargs": "^14.2.0"
   },
   "devDependencies": {
     "gulp-jshint": "^2.1.0",
