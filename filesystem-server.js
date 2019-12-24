@@ -1,6 +1,6 @@
 /*jshint esversion: 8 */
 var express = require('express');
-var yars = require('yargs');
+var yargs = require('yargs');
 var app = express();
 var size = 0;
 var copyName = "";
@@ -14,7 +14,7 @@ const multer = require('multer');
 const fs = require('fs');
 var cors = require('cors')
 
-const contentRootPath = yars.argv.d;
+const contentRootPath = yargs.argv.d;
 
 
 app.use(bodyParser.urlencoded({
