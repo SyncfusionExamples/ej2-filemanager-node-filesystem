@@ -2,7 +2,7 @@
 
 This repository contains the nodeJS file system provider used for Essential JS 2 File Manager component.
 
-## Key Features
+## Key features
 
 The Node.js file system provider module allows you to work with the physical file system. It also provides the methods for performing various file actions like creating a new folder, renaming files, and deleting files.
 
@@ -15,9 +15,7 @@ The following actions can be performed with NodeJS file system provider.
 | Read      | Reads the files from NodeJS file system. |
 | Details   | Gets the file's details which consists of Type, Size, Location and Modified date. |
 | Download  | Downloads the selected file or folder from NodeJS file system. |
-| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics:
-                  - Maximum file size:  30MB
-                - Accepted Media MIME types: */*
+| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*` </li></ul> |
 | Create    | Creates a New folder. |
 | Delete    | Deletes a folder or file. |
 | Copy      | Copys the selected files or folders from target. |
@@ -41,21 +39,21 @@ The EJ2 FileManager allows you to define access permissions for files and folder
 | Role          | Specifies the role to which the rule is applied. |
 | Path          | Specifies the path to apply the rules which are defined. |
 
-For example
+For Example
 ```sh
 {
-    "role": "administrator",
+    "role": "Administator",
     "rules":[
         //Denies downloading the 'Videos' folder.
-        {"path":"/Videos/", "isFile": false,"role": "administrator", "download": "deny", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow"},
+        {"path":"/Videos/", "isFile": false,"role": "Administator", "download": "deny"},
         //Denies uploading files in all folders under 'Pictures' by displaying a custom access denied message.
-        {"path":"/Pictures/*","isFile": false, "role": "administrator","download": "allow", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"deny","message":"you don't have permission for this, Contact administrator for access."  },
+        {"path":"/Pictures/*","isFile": false, "role": "Administator","upload": "deny","message":"you don't have permission for this, Contact admisinistrator for access."  },
         //Denies deleting and renaming all files in 'Downloads' folder.
-        {"path":"/Downloads/*.*","isFile":true, "role": "administrator","download": "allow", "read":"allow", "write": "deny",  "copy": "allow", "writeContents": "allow", "upload":"allow" },
+        {"path":"/Downloads/*.*","isFile":true, "role": "Administator","write": "deny", },
         //Denies opening all 'png' files in 'Employees' folder.
-        {"path":"/Pictures/Employees/*.png","isFile":true, "role": "administrator","download": "allow", "read":"deny", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow" },
+        {"path":"/Pictures/Employees/*.png","isFile":true, "role": "Administator","read": "deny" },
         //Denies downloading all files with name 'FileManager' in 'Documents' folder.
-        {"path":"/Documents/FileManager.*","isFile":true, "role": "administrator", "download": "deny", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow", "message":"you don't have permission for this, Contact administrator for access."  },
+        {"path":"/Documents/FileManager.*","isFile":true, "role": "Administator", "download": "deny", "message":"you don't have permission for this, Contact admisinistrator for access."  },
     ]
 }
 ```
@@ -73,7 +71,7 @@ Follow the below set of commands to configure the nodeJS file system providers.
 
 ```
 
-- To install the depend packages for the file system provider, navigate to @syncfusion/ej2-filemanager-node-filesystem folder within the node_modules and run the below command 
+- To install the depend packages for the file system provider, navigate to @syncfusion/ej2-filemanager-node-filesystem folder within the node_modules and run the following command. 
 
 ```sh
  
@@ -81,15 +79,15 @@ Follow the below set of commands to configure the nodeJS file system providers.
 
 ```
 
-* Now, run the below command line to check the Node API service in local and will be started in `http://localhost:8090/`. By default the nodeJS directory service is configured with `C:/Users`. 
+* Now, run the following command line to check the Node API service in local and will be started in `http://localhost:8090/`. By default, the nodeJS directory service is configured with `C:/Users`. 
 
 ### To configure the directory
 
-* To change the directory use flag `-d` like this `-d D:/Projects`
+* To change the directory, use flag `-d` like this `-d D:/Projects`
  
 ### To configure the port
 
-* To change the port use like this `set PORT=3000`
+* To change the port, use like this `set PORT=3000`
 
 For example: 
 
@@ -99,7 +97,7 @@ set PORT=3000 && node filesystem-server.js -d D:/Projects
 
 ### start the service
 
-To start the service use this command,
+To start the service, use this command.
 
 ```sh
 npm start
@@ -160,18 +158,18 @@ The FileManager will be rendered as follows.
 
 ## Support
 
-Product support is available for through following mediums.
+Product support is available through following mediums:
 
 * Creating incident in Syncfusion [Direct-trac](https://www.syncfusion.com/support/directtrac/incidents?utm_source=npm&utm_campaign=filemanager) support system or [Community forum](https://www.syncfusion.com/forums/essential-js2?utm_source=npm&utm_campaign=filemanager).
 * New [GitHub issue](https://github.com/syncfusion/ej2-javascript-ui-controls/issues/new).
-* Ask your query in [Stack Overflow](https://stackoverflow.com/?utm_source=npm&utm_campaign=filemanager) with tag `syncfusion` and `ej2`.
+* Ask your questions in [Stack Overflow](https://stackoverflow.com/?utm_source=npm&utm_campaign=filemanager) with tag `syncfusion` and `ej2`.
 
 ## License
 
-Check the license detail [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/license).
+Check the license details [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/license).
 
 ## Changelog
 
-Check the changelog [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/controls/filemanager/CHANGELOG.md)
+Check the changelog [here](https://github.com/syncfusion/ej2-javascript-ui-controls/blob/master/controls/filemanager/CHANGELOG.md).
 
 © Copyright 2019 Syncfusion, Inc. All Rights Reserved. The Syncfusion Essential Studio license and copyright applies to this distribution.
