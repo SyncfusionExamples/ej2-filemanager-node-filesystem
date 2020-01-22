@@ -12,10 +12,10 @@ const bodyParser = require("body-parser");
 const archiver = require('archiver');
 const multer = require('multer');
 const fs = require('fs');
-var cors = require('cors')
+var cors = require('cors');
+const pattern=/(\.\.\/)/g;
 
 const contentRootPath = yargs.argv.d;
-
 
 app.use(bodyParser.urlencoded({
     extended: true
@@ -66,7 +66,7 @@ class AccessRules {
  */
 function GetFiles(req, res) {
     return new Promise((resolve, reject) => {
-        fs.readdir(contentRootPath + req.body.path, function (err, files) {
+        fs.readdir(contentRootPath + req.body.path.replace(pattern,""), function (err, files) {
             //handling error
             if (err) {
                 console.log(err);
@@ -681,6 +681,7 @@ function getPermission(filepath, name, isFile, contentRootPath, filterPath) {
 function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
     return new Promise((resolve, reject) => {
         var cwd = {};
+        req.body.path= req.body.path.replace(pattern,"");
         fs.stat(filepath, function (err, stats) {
             cwd.name = path.basename(filepath);
             cwd.size = getSize(stats.size);
@@ -743,6 +744,7 @@ const multerConfig = {
  * Gets the imageUrl from the client
  */
 app.get('/GetImage', function (req, res) {
+    req.body.path= req.body.path.replace(pattern,"");
     var image = req.query.path.split("/").length > 1 ? req.query.path : "/" + req.query.path;
     var pathPermission = getPermission(contentRootPath + image.substr(0, image.lastIndexOf("/")), image.substr(image.lastIndexOf("/") + 1, image.length - 1), true, contentRootPath, image.substr(0, image.lastIndexOf("/")));
     if (pathPermission != null && !pathPermission.read) {
@@ -766,6 +768,7 @@ app.get('/GetImage', function (req, res) {
  * Handles the upload request
  */
 app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res) {
+    req.body.path= req.body.path.replace(pattern,"");
     var pathPermission = getPathPermission(req.path, true, JSON.parse(req.body.data).name, contentRootPath + req.body.path, contentRootPath, JSON.parse(req.body.data).filterPath);
     if (pathPermission != null && (!pathPermission.read || !pathPermission.upload)) {
         var errorMsg = new Error();
@@ -791,6 +794,7 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
  * Download a file or folder
  */
 app.post('/Download', function (req, res) {
+    req.body.path= req.body.path.replace(pattern,"");
     var downloadObj = JSON.parse(req.body.downloadInput);
     var permission; var permissionDenied = false;
     downloadObj.data.forEach(function (item) {
@@ -848,6 +852,7 @@ app.post('/Download', function (req, res) {
  * Handles the read request
  */
 app.post('/', function (req, res) {
+    req.body.path= req.body.path.replace(pattern,"");
     req.setTimeout(0);
     function getRules() {
         var details = new AccessDetails();
@@ -1045,7 +1050,7 @@ app.post('/', function (req, res) {
         }
         var promiseList = [];
         for (var i = 0; i < file.length; i++) {
-            promiseList.push(stats(path.join(contentRootPath + req.body.path, file[i])));
+            promiseList.push(stats(path.join(contentRootPath + req.body.path.replace(pattern,""), file[i])));
         }
         return Promise.all(promiseList);
     }

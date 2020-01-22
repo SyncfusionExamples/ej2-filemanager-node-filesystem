@@ -15,9 +15,7 @@ The following actions can be performed with NodeJS file system provider.
 | Read      | Reads the files from NodeJS file system. |
 | Details   | Gets the file's details which consists of Type, Size, Location and Modified date. |
 | Download  | Downloads the selected file or folder from NodeJS file system. |
-| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics:
-                  - Maximum file size:  30MB
-                - Accepted Media MIME types: */*
+| Upload    | Uploads a file in NodeJS file system. It accepts uploaded media with the following characteristics: <ul><li>Maximum file size:  30MB</li><li>Accepted Media MIME types: `*/*` </li></ul> |
 | Create    | Creates a New folder. |
 | Delete    | Deletes a folder or file. |
 | Copy      | Copys the selected files or folders from target. |
@@ -41,21 +39,21 @@ The EJ2 FileManager allows you to define access permissions for files and folder
 | Role          | Specifies the role to which the rule is applied. |
 | Path          | Specifies the path to apply the rules which are defined. |
 
-For example
+For Example
 ```sh
 {
-    "role": "administrator",
+    "role": "Administator",
     "rules":[
         //Denies downloading the 'Videos' folder.
-        {"path":"/Videos/", "isFile": false,"role": "administrator", "download": "deny", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow"},
+        {"path":"/Videos/", "isFile": false,"role": "Administator", "download": "deny"},
         //Denies uploading files in all folders under 'Pictures' by displaying a custom access denied message.
-        {"path":"/Pictures/*","isFile": false, "role": "administrator","download": "allow", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"deny","message":"you don't have permission for this, Contact administrator for access."  },
+        {"path":"/Pictures/*","isFile": false, "role": "Administator","upload": "deny","message":"you don't have permission for this, Contact admisinistrator for access."  },
         //Denies deleting and renaming all files in 'Downloads' folder.
-        {"path":"/Downloads/*.*","isFile":true, "role": "administrator","download": "allow", "read":"allow", "write": "deny",  "copy": "allow", "writeContents": "allow", "upload":"allow" },
+        {"path":"/Downloads/*.*","isFile":true, "role": "Administator","write": "deny", },
         //Denies opening all 'png' files in 'Employees' folder.
-        {"path":"/Pictures/Employees/*.png","isFile":true, "role": "administrator","download": "allow", "read":"deny", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow" },
+        {"path":"/Pictures/Employees/*.png","isFile":true, "role": "Administator","read": "deny" },
         //Denies downloading all files with name 'FileManager' in 'Documents' folder.
-        {"path":"/Documents/FileManager.*","isFile":true, "role": "administrator", "download": "deny", "read":"allow", "write": "allow",  "copy": "allow", "writeContents": "allow", "upload":"allow", "message":"you don't have permission for this, Contact administrator for access."  },
+        {"path":"/Documents/FileManager.*","isFile":true, "role": "Administator", "download": "deny", "message":"you don't have permission for this, Contact admisinistrator for access."  },
     ]
 }
 ```

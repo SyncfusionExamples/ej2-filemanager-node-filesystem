@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+## 17.4.43 (2020-01-14)
+
+### NodeJS File System Provider
+
+#### Bug Fixes
+
+- `#256589` - The issue with `Directory traversal vulnerability` has been fixed.
+
 ## 17.3.26 (2019-11-05)
 
 ### NodeJS File System Provider
