@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### NodeJS File System Provider
+
+#### Bug Fixes
+
+- `#266713` - The script error thrown while performing the GetImage operation has been fixed.
+
 ## 17.4.43 (2020-01-14)
 
 ### NodeJS File System Provider
