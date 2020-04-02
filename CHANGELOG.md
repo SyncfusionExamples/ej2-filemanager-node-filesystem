@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## 18.1.42 (2020-04-01)
+
 ### NodeJS File System Provider
 
 #### Bug Fixes
