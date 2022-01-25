@@ -772,7 +772,7 @@ app.get('/GetImage', function (req, res) {
  */
 app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res) {
     replaceRequestParams(req, res);
-    var pathPermission = getPathPermission(req.path, true, JSON.parse(req.body.data).name, contentRootPath + req.body.path, contentRootPath, JSON.parse(req.body.data).filterPath);
+    var pathPermission = req.body.data != null ? getPathPermission(req.path, true, JSON.parse(req.body.data).name, contentRootPath + req.body.path, contentRootPath, JSON.parse(req.body.data).filterPath) : null;
     if (pathPermission != null && (!pathPermission.read || !pathPermission.upload)) {
         var errorMsg = new Error();
         errorMsg.message = (permission.message !== "") ? permission.message :
@@ -782,11 +782,28 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
         response = JSON.stringify(response);
         res.setHeader('Content-Type', 'application/json');
         res.json(response);
-    } else {
-        for (var i = 0; i < fileName.length; i++) {
-            fs.rename('./' + fileName[i], path.join(contentRootPath, req.body.path + fileName[i]), function (err) {
-                if (err) throw err;
-            });
+    } else if(req.body != null && req.body.path != null) {
+        var errorValue = new Error();
+        if(req.body.action === 'save'){
+            for (var i = 0; i < fileName.length; i++) {
+                fs.rename('./' + fileName[i], path.join(contentRootPath, req.body.path + fileName[i]), function (err) {
+                    if (err) {
+                        if (err.code != 'EBUSY') {
+                            errorValue.message = err.message;
+                            errorValue.code = err.code;
+                        }
+                    }
+                });
+            }
+        } else if(req.body.action === 'remove') {
+            if (fs.existsSync(path.join(contentRootPath, req.body.path + req.body["cancel-uploading"]))) {
+                fs.unlinkSync(path.join(contentRootPath, req.body.path + req.body["cancel-uploading"]));
+            }
+        }        
+        if(errorValue != null) {
+            response = { error: errorValue };
+            response = JSON.stringify(response);
+            res.setHeader('Content-Type', 'application/json');            
         }
         res.send('Success');
         fileName = [];
