@@ -785,8 +785,27 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
     } else if(req.body != null && req.body.path != null) {
         var errorValue = new Error();
         if(req.body.action === 'save'){
-            for (var i = 0; i < fileName.length; i++) {
-                fs.rename('./' + fileName[i], path.join(contentRootPath, req.body.path + fileName[i]), function (err) {
+            var folders = (req.body.filename).split('/');
+            var filepath = req.body.path;
+            var uploadedFileName = folders[folders.length - 1];
+            // checking the folder upload
+            if (folders.length > 1)
+            {
+                for (var i = 0; i < folders.length - 1; i++)
+                {
+                    var newDirectoryPath = path.join(contentRootPath + filepath, folders[i]);
+                    if (!fs.existsSync(newDirectoryPath)) {
+                        fs.mkdirSync(newDirectoryPath);
+                        (async () => {
+                           await FileManagerDirectoryContent(req, res, newDirectoryPath).then(data => {
+                                response = { files: data };
+                                response = JSON.stringify(response);
+                           });
+                        })();
+                    }
+                    filepath += folders[i] + "/";
+                }
+                fs.rename('./' + uploadedFileName, path.join(contentRootPath, filepath + uploadedFileName), function (err) {
                     if (err) {
                         if (err.code != 'EBUSY') {
                             errorValue.message = err.message;
@@ -794,6 +813,17 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
                         }
                     }
                 });
+            } else {
+            for (var i = 0; i < fileName.length; i++) {
+                fs.rename('./' + fileName[i], path.join(contentRootPath, filepath + fileName[i]), function (err) {
+                    if (err) {
+                        if (err.code != 'EBUSY') {
+                            errorValue.message = err.message;
+                            errorValue.code = err.code;
+                        }
+                    }
+                });
+            }
             }
         } else if(req.body.action === 'remove') {
             if (fs.existsSync(path.join(contentRootPath, req.body.path + req.body["cancel-uploading"]))) {
