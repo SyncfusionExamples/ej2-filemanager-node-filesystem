@@ -15,7 +15,8 @@ const fs = require('fs');
 var cors = require('cors');
 const pattern = /(\.\.\/)/g;
 
-const contentRootPath = yargs.argv.d;
+var contentRootPath = yargs.argv.d;
+contentRootPath=contentRootPath.replace("../","");
 
 app.use(bodyParser.urlencoded({
     extended: true
