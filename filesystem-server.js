@@ -158,11 +158,21 @@ function deleteFolder(req, res, contentRootPath) {
             fs.rmdirSync(path);
         }
     };
-    var permission; var permissionDenied = false;
+    var permission; var permissionDenied = false; var isDeletePrevented = false;
     req.body.data.forEach(function (item) {
         var fromPath = contentRootPath + item.filterPath;
         permission = getPermission(fromPath, item.name, item.isFile, contentRootPath, item.filterPath);
-        if (permission != null && (!permission.read || !permission.write)) {
+        if(req.headers.origin="http://localhost:3000"){
+            isDeletePrevented = true;
+            var errorMsg = new Error();
+            errorMsg.message =  "File Manager's delete functionality is restricted in the online demo. If you need to test delete functionality, please install Syncfusion Essential Studio on your machine and run the demo";
+            errorMsg.code = "401";
+            response = { error: errorMsg };
+            response = JSON.stringify(response);
+            res.setHeader('Content-Type', 'application/json');
+            res.json(response);
+        }
+        if (!isDeletePrevented && permission != null && (!permission.read || !permission.write)) {
             permissionDenied = true;
             var errorMsg = new Error();
             errorMsg.message = (permission.message !== "") ? permission.message : item.name + " is not accessible. You need permission to perform the write action.";
@@ -173,7 +183,7 @@ function deleteFolder(req, res, contentRootPath) {
             res.json(response);
         }
     });
-    if (!permissionDenied) {
+    if (!permissionDenied && !isDeletePrevented) {
         var promiseList = [];
         for (var i = 0; i < req.body.data.length; i++) {
             var newDirectoryPath = path.join(contentRootPath + req.body.data[i].filterPath, req.body.data[i].name);
