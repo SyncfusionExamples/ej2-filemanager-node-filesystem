@@ -162,7 +162,7 @@ function deleteFolder(req, res, contentRootPath) {
     req.body.data.forEach(function (item) {
         var fromPath = contentRootPath + item.filterPath;
         permission = getPermission(fromPath, item.name, item.isFile, contentRootPath, item.filterPath);
-        if(req.headers.origin="http://localhost:3000"){
+        if(req.headers.origin="https://ej2.syncfusion.com"){
             isDeletePrevented = true;
             var errorMsg = new Error();
             errorMsg.message =  "File Manager's delete functionality is restricted in the online demo. If you need to test delete functionality, please install Syncfusion Essential Studio on your machine and run the demo";
