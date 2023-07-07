@@ -696,7 +696,7 @@ function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
             if (searchFilterPath) {
                 cwd.filterPath = searchFilterPath;
             } else {
-                cwd.filterPath = req.body.data.length > 0 ? getRelativePath(contentRootPath, contentRootPath + req.body.path.substring(0, req.body.path.indexOf(req.body.data[0].name))) : "";
+                cwd.filterPath = req.body.data.length > 0 ? req.body.path : "";
             }
             cwd.permission = getPathPermission(req.path, cwd.isFile, (req.body.path == "/") ? "" : cwd.name, filepath, contentRootPath, cwd.filterPath);
             if (fs.lstatSync(filepath).isFile()) {
