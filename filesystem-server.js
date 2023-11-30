@@ -283,7 +283,7 @@ function fileDetails(req, res, filepath) {
         var cwd = {};
         fs.stat(filepath, function (err, stats) {
             cwd.name = path.basename(filepath);
-            cwd.size = getSize(stats.size);
+            cwd.size = stats.size;
             cwd.isFile = stats.isFile();
             cwd.modified = stats.ctime;
             cwd.created = stats.mtime;
@@ -765,7 +765,7 @@ function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
         replaceRequestParams(req, res);
         fs.stat(filepath, function (err, stats) {
             cwd.name = path.basename(filepath);
-            cwd.size = getSize(stats.size);
+            cwd.size = stats.size;
             cwd.isFile = stats.isFile();
             cwd.dateModified = stats.ctime;
             cwd.dateCreated = stats.mtime;
