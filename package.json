@@ -44,7 +44,7 @@
     "gulp": "^4.0.2",
     "require-dir": "^0.3.2",
     "requirejs": "^2.2.0",
-    "shelljs": "^0.7.0"
+    "shelljs": "^0.8.5"
   },
   "scripts": {
     "test": "gulp lint",
