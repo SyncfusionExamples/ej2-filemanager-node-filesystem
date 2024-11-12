@@ -509,48 +509,66 @@ function CopyFiles(req, res, contentRootPath) {
         }
     });
     if (!permissionDenied) {
-        req.body.data.forEach(function (item) {
-            var fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-            var toPath = contentRootPath + req.body.targetPath + item.name;
-            checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
-            if (!isRenameChecking) {
-                const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
-                if (item.isFile) {
-                    fs.copyFileSync(path.join(fromPath), path.join(toPath), (err) => {
-                        if (err) throw err;
-                    });
+        const copyPromises = req.body.data.map((item) => {
+            return new Promise((resolve, reject) => {
+                const fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                let toPath = contentRootPath + req.body.targetPath + item.name;
+                checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
+                if (!isRenameChecking) {
+                    const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
+    
+                    if (item.isFile) {
+                        // File copy operation using promises
+                        fs.copyFile(path.join(fromPath), path.join(toPath), (err) => {
+                            if (err) return reject(err);
+                            const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
+                            fileList.push(list);
+                            resolve();
+                        });
+                    } else {
+                        // Folder copy operation as a promise
+                        copyFolder(fromPath, toPath)
+                            .then(() => {
+                                const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
+                                fileList.push(list);
+                                resolve();
+                            })
+                            .catch((err) => reject(err));
+                    }
+                } else {
+                    replaceFileList.push(item.name);
+                    resolve();
                 }
-                else {
-                    copyFolder(fromPath, toPath)
-                }
-                var list = item;
-                list.filterPath = sanitizedTargetPath;
-                list.name = copyName;
-                fileList.push(list);
-            } else {
-                replaceFileList.push(item.name);
-            }
+            });
         });
-        if (replaceFileList.length == 0) {
-            copyName = "";
-            response = { files: fileList };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        } else {
-            isRenameChecking = false;
-            var errorMsg = new Error();
-            errorMsg.message = "File Already Exists.";
-            errorMsg.code = "400";
-            errorMsg.fileExists = replaceFileList;
-            response = { error: errorMsg, files: [] };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        }
-    }
+    
+        Promise.all(copyPromises)
+            .then(() => {
+                if (replaceFileList.length === 0) {
+                    copyName = "";
+                    response = { files: fileList };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                } else {
+                    isRenameChecking = false;
+                    const errorMsg = {
+                        message: "File Already Exists.",
+                        code: "400",
+                        fileExists: replaceFileList
+                    };
+                    response = { error: errorMsg, files: [] };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                }
+            })
+            .catch((err) => {
+                response = { error: err };
+                res.setHeader('Content-Type', 'application/json');
+                res.json(response);
+            });
+    }    
 }
 
 function MoveFolder(source, dest) {
@@ -613,54 +631,73 @@ function MoveFiles(req, res, contentRootPath) {
         }
     });
     if (!permissionDenied) {
-        req.body.data.forEach(function (item) {
-            var fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-            var toPath = contentRootPath + req.body.targetPath + item.name;
-            checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
-            if (!isRenameChecking) {
-                const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
-                if (item.isFile) {
-                    var source = fs.createReadStream(path.join(fromPath));
-                    var desti = fs.createWriteStream(path.join(toPath));
-                    source.pipe(desti);
-                    source.on('end', function () {
-                        fs.unlinkSync(path.join(fromPath), function (err) {
-                            if (err) throw err;
+        const movePromises = req.body.data.map((item) => {
+            return new Promise((resolve, reject) => {
+                const fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                let toPath = contentRootPath + req.body.targetPath + item.name;
+                checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
+                if (!isRenameChecking) {
+                    const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
+
+                    if (item.isFile) {
+                        const source = fs.createReadStream(path.join(fromPath));
+                        const desti = fs.createWriteStream(path.join(toPath));
+
+                        source.pipe(desti);
+                        source.on('end', () => {
+                            fs.unlink(path.join(fromPath), (err) => {
+                                if (err) return reject(err);
+                                const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
+                                fileList.push(list);
+                                resolve();
+                            });
                         });
-                    });
+
+                        source.on('error', (err) => reject(err));
+                        desti.on('error', (err) => reject(err));
+                    } else {
+                        MoveFolder(fromPath, toPath)
+                            .then(() => {
+                                fs.rmdirSync(fromPath);
+                                const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
+                                fileList.push(list);
+                                resolve();
+                            })
+                            .catch((err) => reject(err));
+                    }
+                } else {
+                    replaceFileList.push(item.name);
+                    resolve();
                 }
-                else {
-                    MoveFolder(fromPath, toPath);
-                    fs.rmdirSync(fromPath);
-                }
-                var list = item;
-                list.name = copyName;
-                list.filterPath = sanitizedTargetPath;
-                fileList.push(list);
-            } else {
-                replaceFileList.push(item.name);
-            }
+            });
         });
-        if (replaceFileList.length == 0) {
-            copyName = "";
-            response = { files: fileList };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        }
-        else {
-            isRenameChecking = false;
-            var errorMsg = new Error();
-            errorMsg.message = "File Already Exists.";
-            errorMsg.code = "400";
-            errorMsg.fileExists = replaceFileList;
-            response = { error: errorMsg, files: [] };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        }
+
+        Promise.all(movePromises)
+            .then(() => {
+                if (replaceFileList.length === 0) {
+                    copyName = "";
+                    response = { files: fileList };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                } else {
+                    isRenameChecking = false;
+                    const errorMsg = {
+                        message: "File Already Exists.",
+                        code: "400",
+                        fileExists: replaceFileList
+                    };
+                    response = { error: errorMsg, files: [] };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                }
+            })
+            .catch((err) => {
+                response = { error: err };
+                res.setHeader('Content-Type', 'application/json');
+                res.json(response);
+            });
     }
 }
 
