@@ -422,19 +422,33 @@ function getFileDetails(req, res, contentRootPath, filterPath) {
 }
 
 function copyFolder(source, dest) {
-    if (!fs.existsSync(dest)) {
-        fs.mkdirSync(dest);
-    }
-    files = fs.readdirSync(source);
-    files.forEach(function (file) {
-        var curSource = path.join(source, file);
-        if (fs.lstatSync(curSource).isDirectory()) {
-            copyFolder(curSource, path.join(dest, file)); source
-        } else {
-            fs.copyFileSync(path.join(source, file), path.join(dest, file), (err) => {
-                if (err) throw err;
-            });
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest);
         }
+
+        const files = fs.readdirSync(source);
+        const copyOperations = files.map((file) => {
+            return new Promise((innerResolve, innerReject) => {
+                const curSource = path.join(source, file);
+                const curDest = path.join(dest, file);
+
+                if (fs.lstatSync(curSource).isDirectory()) {
+                    copyFolder(curSource, curDest)
+                        .then(innerResolve)
+                        .catch(innerReject);
+                } else {
+                    fs.copyFile(curSource, curDest, (err) => {
+                        if (err) return innerReject(err);
+                        innerResolve();
+                    });
+                }
+            });
+        });
+
+        Promise.all(copyOperations)
+            .then(resolve)
+            .catch(reject);
     });
 }
 
@@ -572,23 +586,39 @@ function CopyFiles(req, res, contentRootPath) {
 }
 
 function MoveFolder(source, dest) {
-    if (!fs.existsSync(dest)) {
-        fs.mkdirSync(dest);
-    }
-    files = fs.readdirSync(source);
-    files.forEach(function (file) {
-        var curSource = path.join(source, file);
-        if (fs.lstatSync(curSource).isDirectory()) {
-            MoveFolder(curSource, path.join(dest, file));
-            fs.rmdirSync(curSource);
-        } else {
-            fs.copyFileSync(path.join(source, file), path.join(dest, file), (err) => {
-                if (err) throw err;
-            });
-            fs.unlinkSync(path.join(source, file), function (err) {
-                if (err) throw err;
-            });
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest);
         }
+
+        const files = fs.readdirSync(source);
+        const fileOperations = files.map((file) => {
+            return new Promise((innerResolve, innerReject) => {
+                const curSource = path.join(source, file);
+                const curDest = path.join(dest, file);
+
+                if (fs.lstatSync(curSource).isDirectory()) {
+                    MoveFolder(curSource, curDest)
+                        .then(() => {
+                            fs.rmdirSync(curSource);
+                            innerResolve();
+                        })
+                        .catch(innerReject);
+                } else {
+                    fs.copyFile(curSource, curDest, (err) => {
+                        if (err) return innerReject(err);
+                        fs.unlink(curSource, (unlinkErr) => {
+                            if (unlinkErr) return innerReject(unlinkErr);
+                            innerResolve();
+                        });
+                    });
+                }
+            });
+        });
+
+        Promise.all(fileOperations)
+            .then(resolve)
+            .catch(reject);
     });
 }
 /**
