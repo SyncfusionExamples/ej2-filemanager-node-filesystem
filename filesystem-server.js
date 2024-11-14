@@ -537,20 +537,20 @@ function CopyFiles(req, res, contentRootPath) {
                         // File copy operation using promises
                         fs.copyFile(path.join(fromPath), path.join(toPath), (err) => {
                             if (err) return reject(err);
-                            const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
-                            fileList.push(list);
                             resolve();
                         });
                     } else {
                         // Folder copy operation as a promise
                         copyFolder(fromPath, toPath)
                             .then(() => {
-                                const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
-                                fileList.push(list);
                                 resolve();
                             })
                             .catch((err) => reject(err));
                     }
+                    var list = item;
+                    list.filterPath = sanitizedTargetPath;
+                    list.name = copyName;
+                    fileList.push(list);
                 } else {
                     replaceFileList.push(item.name);
                     resolve();
@@ -679,8 +679,6 @@ function MoveFiles(req, res, contentRootPath) {
                         source.on('end', () => {
                             fs.unlink(path.join(fromPath), (err) => {
                                 if (err) return reject(err);
-                                const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
-                                fileList.push(list);
                                 resolve();
                             });
                         });
@@ -691,12 +689,14 @@ function MoveFiles(req, res, contentRootPath) {
                         MoveFolder(fromPath, toPath)
                             .then(() => {
                                 fs.rmdirSync(fromPath);
-                                const list = { ...item, name: copyName, filterPath: sanitizedTargetPath };
-                                fileList.push(list);
                                 resolve();
                             })
                             .catch((err) => reject(err));
                     }
+                    var list = item;
+                    list.name = copyName;
+                    list.filterPath = sanitizedTargetPath;
+                    fileList.push(list);
                 } else {
                     replaceFileList.push(item.name);
                     resolve();
@@ -852,14 +852,15 @@ function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
         });
         if (fs.lstatSync(filepath).isDirectory()) {
             fs.readdir(filepath, function (err, stats) {
-                stats.forEach(stat => {
-                    if (fs.lstatSync(filepath + stat).isDirectory()) {
-                        cwd.hasChild = true
-                    } else {
-                        cwd.hasChild = false;
+                var hasChild = stats.some(stat => {
+                    try {
+                        const fullPath = path.join(filepath, stat);
+                        return fs.lstatSync(fullPath).isDirectory();
+                    } catch (error) {
+                        return false;
                     }
-                    if (cwd.hasChild) return;
                 });
+                cwd.hasChild = hasChild;
                 resolve(cwd);
             });
         }
