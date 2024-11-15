@@ -422,19 +422,33 @@ function getFileDetails(req, res, contentRootPath, filterPath) {
 }
 
 function copyFolder(source, dest) {
-    if (!fs.existsSync(dest)) {
-        fs.mkdirSync(dest);
-    }
-    files = fs.readdirSync(source);
-    files.forEach(function (file) {
-        var curSource = path.join(source, file);
-        if (fs.lstatSync(curSource).isDirectory()) {
-            copyFolder(curSource, path.join(dest, file)); source
-        } else {
-            fs.copyFileSync(path.join(source, file), path.join(dest, file), (err) => {
-                if (err) throw err;
-            });
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest);
         }
+
+        const files = fs.readdirSync(source);
+        const copyOperations = files.map((file) => {
+            return new Promise((innerResolve, innerReject) => {
+                const curSource = path.join(source, file);
+                const curDest = path.join(dest, file);
+
+                if (fs.lstatSync(curSource).isDirectory()) {
+                    copyFolder(curSource, curDest)
+                        .then(innerResolve)
+                        .catch(innerReject);
+                } else {
+                    fs.copyFile(curSource, curDest, (err) => {
+                        if (err) return innerReject(err);
+                        innerResolve();
+                    });
+                }
+            });
+        });
+
+        Promise.all(copyOperations)
+            .then(resolve)
+            .catch(reject);
     });
 }
 
@@ -509,68 +523,102 @@ function CopyFiles(req, res, contentRootPath) {
         }
     });
     if (!permissionDenied) {
-        req.body.data.forEach(function (item) {
-            var fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-            var toPath = contentRootPath + req.body.targetPath + item.name;
-            checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
-            if (!isRenameChecking) {
-                const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
-                if (item.isFile) {
-                    fs.copyFileSync(path.join(fromPath), path.join(toPath), (err) => {
-                        if (err) throw err;
-                    });
+        const copyPromises = req.body.data.map((item) => {
+            return new Promise((resolve, reject) => {
+                const fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                let toPath = contentRootPath + req.body.targetPath + item.name;
+                checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
+                if (!isRenameChecking) {
+                    const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
+    
+                    if (item.isFile) {
+                        // File copy operation using promises
+                        fs.copyFile(path.join(fromPath), path.join(toPath), (err) => {
+                            if (err) return reject(err);
+                            resolve();
+                        });
+                    } else {
+                        // Folder copy operation as a promise
+                        copyFolder(fromPath, toPath)
+                            .then(() => {
+                                resolve();
+                            })
+                            .catch((err) => reject(err));
+                    }
+                    var list = item;
+                    list.filterPath = sanitizedTargetPath;
+                    list.name = copyName;
+                    fileList.push(list);
+                } else {
+                    replaceFileList.push(item.name);
+                    resolve();
                 }
-                else {
-                    copyFolder(fromPath, toPath)
-                }
-                var list = item;
-                list.filterPath = sanitizedTargetPath;
-                list.name = copyName;
-                fileList.push(list);
-            } else {
-                replaceFileList.push(item.name);
-            }
+            });
         });
-        if (replaceFileList.length == 0) {
-            copyName = "";
-            response = { files: fileList };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        } else {
-            isRenameChecking = false;
-            var errorMsg = new Error();
-            errorMsg.message = "File Already Exists.";
-            errorMsg.code = "400";
-            errorMsg.fileExists = replaceFileList;
-            response = { error: errorMsg, files: [] };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        }
-    }
+    
+        Promise.all(copyPromises)
+            .then(() => {
+                if (replaceFileList.length === 0) {
+                    copyName = "";
+                    response = { files: fileList };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                } else {
+                    isRenameChecking = false;
+                    const errorMsg = {
+                        message: "File Already Exists.",
+                        code: "400",
+                        fileExists: replaceFileList
+                    };
+                    response = { error: errorMsg, files: [] };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                }
+            })
+            .catch((err) => {
+                response = { error: err };
+                res.setHeader('Content-Type', 'application/json');
+                res.json(response);
+            });
+    }    
 }
 
 function MoveFolder(source, dest) {
-    if (!fs.existsSync(dest)) {
-        fs.mkdirSync(dest);
-    }
-    files = fs.readdirSync(source);
-    files.forEach(function (file) {
-        var curSource = path.join(source, file);
-        if (fs.lstatSync(curSource).isDirectory()) {
-            MoveFolder(curSource, path.join(dest, file));
-            fs.rmdirSync(curSource);
-        } else {
-            fs.copyFileSync(path.join(source, file), path.join(dest, file), (err) => {
-                if (err) throw err;
-            });
-            fs.unlinkSync(path.join(source, file), function (err) {
-                if (err) throw err;
-            });
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest);
         }
+
+        const files = fs.readdirSync(source);
+        const fileOperations = files.map((file) => {
+            return new Promise((innerResolve, innerReject) => {
+                const curSource = path.join(source, file);
+                const curDest = path.join(dest, file);
+
+                if (fs.lstatSync(curSource).isDirectory()) {
+                    MoveFolder(curSource, curDest)
+                        .then(() => {
+                            fs.rmdirSync(curSource);
+                            innerResolve();
+                        })
+                        .catch(innerReject);
+                } else {
+                    fs.copyFile(curSource, curDest, (err) => {
+                        if (err) return innerReject(err);
+                        fs.unlink(curSource, (unlinkErr) => {
+                            if (unlinkErr) return innerReject(unlinkErr);
+                            innerResolve();
+                        });
+                    });
+                }
+            });
+        });
+
+        Promise.all(fileOperations)
+            .then(resolve)
+            .catch(reject);
     });
 }
 /**
@@ -613,54 +661,73 @@ function MoveFiles(req, res, contentRootPath) {
         }
     });
     if (!permissionDenied) {
-        req.body.data.forEach(function (item) {
-            var fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-            var toPath = contentRootPath + req.body.targetPath + item.name;
-            checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
-            if (!isRenameChecking) {
-                const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
-                if (item.isFile) {
-                    var source = fs.createReadStream(path.join(fromPath));
-                    var desti = fs.createWriteStream(path.join(toPath));
-                    source.pipe(desti);
-                    source.on('end', function () {
-                        fs.unlinkSync(path.join(fromPath), function (err) {
-                            if (err) throw err;
+        const movePromises = req.body.data.map((item) => {
+            return new Promise((resolve, reject) => {
+                const fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                let toPath = contentRootPath + req.body.targetPath + item.name;
+                checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
+                if (!isRenameChecking) {
+                    const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                    toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
+
+                    if (item.isFile) {
+                        const source = fs.createReadStream(path.join(fromPath));
+                        const desti = fs.createWriteStream(path.join(toPath));
+
+                        source.pipe(desti);
+                        source.on('end', () => {
+                            fs.unlink(path.join(fromPath), (err) => {
+                                if (err) return reject(err);
+                                resolve();
+                            });
                         });
-                    });
+
+                        source.on('error', (err) => reject(err));
+                        desti.on('error', (err) => reject(err));
+                    } else {
+                        MoveFolder(fromPath, toPath)
+                            .then(() => {
+                                fs.rmdirSync(fromPath);
+                                resolve();
+                            })
+                            .catch((err) => reject(err));
+                    }
+                    var list = item;
+                    list.name = copyName;
+                    list.filterPath = sanitizedTargetPath;
+                    fileList.push(list);
+                } else {
+                    replaceFileList.push(item.name);
+                    resolve();
                 }
-                else {
-                    MoveFolder(fromPath, toPath);
-                    fs.rmdirSync(fromPath);
-                }
-                var list = item;
-                list.name = copyName;
-                list.filterPath = sanitizedTargetPath;
-                fileList.push(list);
-            } else {
-                replaceFileList.push(item.name);
-            }
+            });
         });
-        if (replaceFileList.length == 0) {
-            copyName = "";
-            response = { files: fileList };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        }
-        else {
-            isRenameChecking = false;
-            var errorMsg = new Error();
-            errorMsg.message = "File Already Exists.";
-            errorMsg.code = "400";
-            errorMsg.fileExists = replaceFileList;
-            response = { error: errorMsg, files: [] };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
-        }
+
+        Promise.all(movePromises)
+            .then(() => {
+                if (replaceFileList.length === 0) {
+                    copyName = "";
+                    response = { files: fileList };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                } else {
+                    isRenameChecking = false;
+                    const errorMsg = {
+                        message: "File Already Exists.",
+                        code: "400",
+                        fileExists: replaceFileList
+                    };
+                    response = { error: errorMsg, files: [] };
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                }
+            })
+            .catch((err) => {
+                response = { error: err };
+                res.setHeader('Content-Type', 'application/json');
+                res.json(response);
+            });
     }
 }
 
@@ -785,14 +852,15 @@ function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
         });
         if (fs.lstatSync(filepath).isDirectory()) {
             fs.readdir(filepath, function (err, stats) {
-                stats.forEach(stat => {
-                    if (fs.lstatSync(filepath + stat).isDirectory()) {
-                        cwd.hasChild = true
-                    } else {
-                        cwd.hasChild = false;
+                var hasChild = stats.some(stat => {
+                    try {
+                        const fullPath = path.join(filepath, stat);
+                        return fs.lstatSync(fullPath).isDirectory();
+                    } catch (error) {
+                        return false;
                     }
-                    if (cwd.hasChild) return;
                 });
+                cwd.hasChild = hasChild;
                 resolve(cwd);
             });
         }
