@@ -959,9 +959,13 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
         response = JSON.stringify(response);
         res.setHeader('Content-Type', 'application/json');
         res.json(response);
-    } else if(req.body != null && req.body.path != null) {
+    }
+
+    if (req.body != null && req.body.path != null) {
         var errorValue = new Error();
-        if(req.body.action === 'save'){
+        var existFiles = [];
+
+        if (req.body.action === 'save' || req.body.action === 'keepboth' || req.body.action === 'replace') {
             var folders = (path.normalize(req.body.filename).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, "/")).split('/');
             var filepath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, "/");
             var uploadedFileName = folders[folders.length - 1];
@@ -984,58 +988,50 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
                     }
                     if (!fs.existsSync(newDirectoryPath)) {
                         fs.mkdirSync(newDirectoryPath);
-                        (async () => {
-                           await FileManagerDirectoryContent(req, res, newDirectoryPath).then(data => {
-                                response = { files: data };
-                                response = JSON.stringify(response);
-                           });
-                        })();
                     }
                     filepath += folders[i] + "/";
                 }
-                fs.rename('./' + uploadedFileName, path.join(contentRootPath, filepath + uploadedFileName), function (err) {
-                    if (err) {
-                        if (err.code != 'EBUSY') {
-                            errorValue.message = err.message;
-                            errorValue.code = err.code;
-                        }
-                    }
-                });
-            } else {
-            for (var i = 0; i < fileName.length; i++) {
-                const resolvedPath = path.join(contentRootPath + filepath, fileName[i]);
-                const fullPath = (contentRootPath + filepath + fileName[i]).replace(/[\\/]/g, "\\");
-                const isValidatePath = fullPath == resolvedPath ? true : false;
-                if(!isValidatePath){
-                    var errorMsg = new Error();
-                    errorMsg.message = "Access denied for Directory-traversal";
-                    errorMsg.code = "401";
-                    response = { error: errorMsg };
-                    response = JSON.stringify(response);
-                    res.setHeader('Content-Type', 'application/json');
-                    res.json(response);
+            }
+
+            const fullFilePath = path.join(contentRootPath, filepath + uploadedFileName);
+
+            if (req.body.action === 'save') {
+                if (fs.existsSync(fullFilePath)) {
+                    existFiles.push(fullFilePath);
+                } else {
+                    fs.renameSync('./' + uploadedFileName, fullFilePath);
                 }
-                fs.rename('./' + fileName[i], path.join(contentRootPath, filepath + fileName[i]), function (err) {
-                    if (err) {
-                        if (err.code != 'EBUSY') {
-                            errorValue.message = err.message;
-                            errorValue.code = err.code;
-                        }
-                    }
-                });
+            } else if (req.body.action === 'replace') {
+                if (fs.existsSync(fullFilePath)) {
+                    fs.unlinkSync(fullFilePath);
+                }
+                fs.renameSync('./' + uploadedFileName, fullFilePath);
+            } else if (req.body.action === 'keepboth') {
+                let newName = fullFilePath;
+                let fileCount = 0;
+                while (fs.existsSync(newName)) {
+                    fileCount++;
+                    const parsedPath = path.parse(fullFilePath);
+                    newName = path.join(parsedPath.dir, `${parsedPath.name}(${fileCount})${parsedPath.ext}`);
+                }
+                fs.renameSync('./' + uploadedFileName, newName);
             }
-            }
-        } else if(req.body.action === 'remove') {
+        } else if (req.body.action === 'remove') {
             const normalizedPath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
             const cancelUploadValue = path.normalize(req.body['cancel-upload']).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
             if (fs.existsSync(path.join(contentRootPath, normalizedPath + cancelUploadValue))) {
                 fs.unlinkSync(path.join(contentRootPath, normalizedPath + cancelUploadValue));
             }
-        }        
-        if(errorValue != null) {
+        }
+
+        if (existFiles.length > 0) {
+            errorValue.message = "File already exists.";
+            errorValue.code = "400";
+            errorValue.fileExists = existFiles;
             response = { error: errorValue };
             response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');            
+            res.setHeader('Content-Type', 'application/json');
+            return res.status(400).json(response);
         }
         res.send('Success');
         fileName = [];
