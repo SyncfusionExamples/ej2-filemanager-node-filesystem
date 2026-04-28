@@ -1,0 +1,20 @@
+{
+    "role": "Document Manager",
+    "rules":[
+        {"path":"/Documents/*.*", "role": "Document Manager", "read":"allow", "write": "allow", "writeContents": null, "download": "allow", "upload": null, "isFile": true},
+        {"path":"/*.png", "role": "Document Manager", "read":"allow", "write": "deny", "writeContents": null, "download": "deny", "upload": null, "isFile": true},
+        {"path":"/Documents/*.png", "role": "Document Manager", "read": "deny", "write": "allow", "writeContents": null, "download": "allow", "upload": null, "isFile": true},
+        {"path":"/2.*", "role": "Document Manager", "read": "allow", "write": "allow", "writeContents": null, "download": "deny", "upload": null, "isFile": true},
+        {"path":"/Documents/2.*", "role": "Document Manager", "read": "deny", "write": "deny", "writeContents": null, "download": "allow", "upload": null, "isFile": true},
+        {"path":"/2.png", "role": "Document Manager", "read": "allow", "write": "allow", "writeContents": null, "download": "allow", "upload": null, "isFile": true},
+        {"path":"/Documents/2.png", "role": "Document Manager", "read": "deny", "write": "deny", "writeContents": null, "download": "deny", "upload": null, "isFile": true},
+        {"path":"/text", "role": "Document Manager", "read": "allow", "write": "allow", "writeContents": null, "download": "allow", "upload": null, "isFile": true},
+        {"path":"/Documents/text", "role": "Document Manager", "read": "allow", "write": "deny", "writeContents": null, "download": "deny", "upload": null, "isFile": true},
+        {"path":"*", "role": "Document Manager", "read": "allow", "write": "deny", "writeContents": "deny", "download": "deny", "upload": "deny", "isFile": false},
+        {"path":"/", "role": "Document Manager", "read": "allow", "write": "deny", "writeContents": "deny", "download": "deny", "upload": "deny", "isFile": false},
+        {"path":"/Documents", "role": "Document Manager", "read": "allow", "write": "deny", "writeContents": "allow", "download": "deny", "upload": "allow", "isFile": false},
+        {"path":"/Documents/*", "role": "Document Manager", "read": "allow", "write": "allow", "writeContents": "allow", "download": "allow", "upload": "allow", "isFile": false},
+        {"path":"/Music.png", "role": "Document Manager", "read": "allow", "write": "allow", "writeContents": "allow", "download": "allow", "upload": "allow", "isFile": false},
+        {"path":"/Documents/Music.png", "role": "Document Manager", "read": "allow", "write": "allow", "writeContents": "allow", "download": "deny", "upload": "deny", "isFile": false}
+    ]
+}

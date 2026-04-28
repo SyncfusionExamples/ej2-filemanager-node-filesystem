@@ -68,13 +68,54 @@ class AccessRules {
         this.message = message
     }
 }
+function encodeHtml(value) {
+    if (typeof value !== "string") {
+        return value;
+    }
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function validateFileName(name) {
+    if (typeof name !== "string") {
+        return false;
+    }
+    if (!name || name === "." || name === "..") {
+        return false;
+    }
+    if (name.length > 255) {
+        return false;
+    }
+    var dangerousPattern = /[<>:"/\\|?*\x00-\x1F]/;
+    return !dangerousPattern.test(name);
+}
+
+function validatePathAgainstRoot(contentRootPath, userRelativePath) {
+    var resolvedRootPath = path.resolve(contentRootPath);
+    var normalizedPath = (userRelativePath || "").replace(/^[\/\\]+/, "").replace(/[\/\\]+$/, "");
+    var resolvedTargetPath = path.resolve(resolvedRootPath, normalizedPath || ".");
+    var relative = path.relative(resolvedRootPath, resolvedTargetPath);
+    return relative === "" || relative === "." || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function sendAccessDenied(res, message) {
+    var errorMsg = new Error();
+    errorMsg.message = "Access denied for Directory-traversal";
+    errorMsg.code = "401";
+    var response = JSON.stringify({ error: errorMsg });
+    res.setHeader('Content-Type', 'application/json');
+    return res.json(response);
+}
 /**
  * Reads text from the file asynchronously and returns a Promise.
  */
 function GetFiles(req, res) {
     return new Promise((resolve, reject) => {
-        const sanitizedPath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-        fs.readdir(contentRootPath + sanitizedPath, function (err, files) {
+        fs.readdir(contentRootPath + req.body.path.replace(pattern, ""), function (err, files) {
             //handling error
             if (err) {
                 console.log(err);
@@ -113,20 +154,13 @@ function checkForDuplicates(directory, name, isFile) {
 function renameFolder(req, res) {
     var oldName = req.body.data[0].name.split("/")[req.body.data[0].name.split("/").length - 1];
     var newName = req.body.newName.split("/")[req.body.newName.split("/").length - 1];
-    const resolvedOldDirectoryPath = path.resolve(contentRootPath + req.body.data[0].filterPath, oldName);
-    const resolvedNewDirectoryPath = path.resolve(contentRootPath + req.body.data[0].filterPath, newName);
-    const fullOldPath = (contentRootPath + req.body.data[0].filterPath + oldName ).replace(/[\\/]/g, "\\");
-    const fullNewPath = (contentRootPath + req.body.data[0].filterPath + newName ).replace(/[\\/]/g, "\\");
-    const isValidateOldPath = fullOldPath == resolvedOldDirectoryPath ? true : false;
-    const isValidateNewPath = fullNewPath == resolvedNewDirectoryPath ? true : false;
+    if (!validateFileName(newName)) {
+        return sendAccessDenied(res);
+    }
+    const isValidateOldPath = validatePathAgainstRoot(contentRootPath, req.body.data[0].filterPath + oldName);
+    const isValidateNewPath = validatePathAgainstRoot(contentRootPath, req.body.data[0].filterPath + newName);
     if(!isValidateOldPath || !isValidateNewPath){
-        var errorMsg = new Error();
-        errorMsg.message = "Access denied for Directory-traversal";
-        errorMsg.code = "401";
-        response = { error: errorMsg };
-        response = JSON.stringify(response);
-        res.setHeader('Content-Type', 'application/json');
-        res.json(response);
+        return sendAccessDenied(res);
     }
     var permission = getPermission((contentRootPath + req.body.data[0].filterPath), oldName, req.body.data[0].isFile, contentRootPath, req.body.data[0].filterPath);
     if (permission != null && (!permission.read || !permission.write)) {
@@ -138,12 +172,11 @@ function renameFolder(req, res) {
         res.setHeader('Content-Type', 'application/json');
         res.json(response);
     } else {
-        var sanitizedPath = path.normalize(req.body.data[0].filterPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-        var oldDirectoryPath = path.join(contentRootPath + sanitizedPath, oldName);
-        var newDirectoryPath = path.join(contentRootPath + sanitizedPath, newName);
-        if (checkForDuplicates(contentRootPath + sanitizedPath, newName, req.body.data[0].isFile)) {
+        var oldDirectoryPath = path.join(contentRootPath + req.body.data[0].filterPath, oldName);
+        var newDirectoryPath = path.join(contentRootPath + req.body.data[0].filterPath, newName);
+        if (checkForDuplicates(contentRootPath + req.body.data[0].filterPath, newName, req.body.data[0].isFile)) {
             var errorMsg = new Error();
-            errorMsg.message = "A file or folder with the name " + req.body.name + " already exists.";
+            errorMsg.message = "A file or folder with the name " + encodeHtml(req.body.name) + " already exists.";
             errorMsg.code = "400";
             response = { error: errorMsg };
 
@@ -181,18 +214,11 @@ function deleteFolder(req, res, contentRootPath) {
         }
     };
     var permission; var permissionDenied = false;
-    req.body.data.forEach(function (item) {
-        const resolvedPath = path.join(contentRootPath + item.filterPath, item.name);
-        const fullPath = (contentRootPath + item.filterPath + item.name ).replace(/[\\/]/g, "\\");
-        const isValidatePath = fullPath == resolvedPath ? true : false;
+    for (var i = 0; i < req.body.data.length; i++) {
+        var item = req.body.data[i];
+        const isValidatePath = validatePathAgainstRoot(contentRootPath, item.filterPath + item.name);
         if(!isValidatePath){
-            var errorMsg = new Error();
-            errorMsg.message = "Access denied for Directory-traversal";
-            errorMsg.code = "401";
-            response = { error: errorMsg };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
+            return sendAccessDenied(res);
         }
         var fromPath = contentRootPath + item.filterPath;
         permission = getPermission(fromPath, item.name, item.isFile, contentRootPath, item.filterPath);
@@ -206,7 +232,7 @@ function deleteFolder(req, res, contentRootPath) {
             res.setHeader('Content-Type', 'application/json');
             res.json(response);
         }
-    });
+    };
     if (!permissionDenied) {
         var promiseList = [];
         for (var i = 0; i < req.body.data.length; i++) {
@@ -222,9 +248,8 @@ function deleteFolder(req, res, contentRootPath) {
                 if (fs.lstatSync(path.join(contentRootPath + files.filterPath, files.name)).isFile()) {
                     fs.unlinkSync(path.join(contentRootPath + files.filterPath, files.name));
                 } else {
-                    const deleteFolderPath = path.join(contentRootPath + files.filterPath, files.name);
-                    const sanitizedPath = path.normalize(deleteFolderPath).replace(/^(\.\.[\/\\])+/, '');
-                    deleteFolderRecursive(path.join(sanitizedPath));
+                    const deleteFolderPath = path.join(contentRootPath,files.filterPath,files.name);
+                    deleteFolderRecursive(deleteFolderPath);
                 }
             });
             response = { files: data };
@@ -238,25 +263,18 @@ function deleteFolder(req, res, contentRootPath) {
  * function to create the folder
  */
 function createFolder(req, res, filepath, contentRootPath) {
-    const sanitizedPath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-    const sanitizedPathName = path.normalize(req.body.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-    var newDirectoryPath = path.join(contentRootPath + sanitizedPath, sanitizedPathName);
-    const resolvedPath = newDirectoryPath.replace(/[\\/]/g, "\\\\");
-    const fullPath = (contentRootPath + req.body.path+req.body.name).replace(/\//g, "\\\\");
-    const isValidatePath = fullPath == resolvedPath ? true : false;
+    var newDirectoryPath = path.join(contentRootPath + req.body.path, req.body.name);
+    if (!validateFileName(req.body.name)) {
+        return sendAccessDenied(res);
+    }
+    const isValidatePath = validatePathAgainstRoot(contentRootPath, req.body.path + req.body.name);
     if(!isValidatePath){
-        var errorMsg = new Error();
-        errorMsg.message = "Access denied for Directory-traversal";
-        errorMsg.code = "401";
-        response = { error: errorMsg };
-        response = JSON.stringify(response);
-        res.setHeader('Content-Type', 'application/json');
-        res.json(response);
+        return sendAccessDenied(res);
     }
     var pathPermission = getPathPermission(req.path, false, req.body.data[0].name, filepath, contentRootPath, req.body.data[0].filterPath);
     if (pathPermission != null && (!pathPermission.read || !pathPermission.writeContents)) {
         var errorMsg = new Error();
-        errorMsg.message = (permission.message !== "") ? permission.message : req.body.data[0].name + " is not accessible. You need permission to perform the writeContents action.";
+        errorMsg.message = (pathPermission.message !== "") ? pathPermission.message : req.body.data[0].name + " is not accessible. You need permission to perform the writeContents action.";
         errorMsg.code = "401";
         response = { error: errorMsg };
         response = JSON.stringify(response);
@@ -266,7 +284,7 @@ function createFolder(req, res, filepath, contentRootPath) {
     else {
         if (fs.existsSync(newDirectoryPath)) {
             var errorMsg = new Error();
-            errorMsg.message = "A file or folder with the name " + req.body.name + " already exists.";
+            errorMsg.message = "A file or folder with the name " + encodeHtml(req.body.name) + " already exists.";
             errorMsg.code = "400";
             response = { error: errorMsg };
 
@@ -293,7 +311,7 @@ function fileDetails(req, res, filepath) {
     return new Promise((resolve, reject) => {
         var cwd = {};
         fs.stat(filepath, function (err, stats) {
-            cwd.name = path.basename(filepath);
+            cwd.name = encodeHtml(path.basename(filepath));
             cwd.size = getSize(stats.size);
             cwd.isFile = stats.isFile();
             cwd.modified = stats.ctime;
@@ -354,7 +372,20 @@ function checkForMultipleLocations(req, contentRootPath) {
     return isMultipleLocation;
 }
 function getFileDetails(req, res, contentRootPath, filterPath) {
+    for (var i = 0; i < req.body.data.length; i++) {
+        var item = req.body.data[i];
+        if (!validatePathAgainstRoot(contentRootPath, item.filterPath + item.name)) {
+            return sendAccessDenied(res);
+        }
+    }
     var isNamesAvailable = req.body.names.length > 0 ? true : false;
+    if (isNamesAvailable) {
+        for (var n = 0; n < req.body.names.length; n++) {
+            if (!validatePathAgainstRoot(contentRootPath, req.body.names[n])) {
+                return sendAccessDenied(res);
+            }
+        }
+    }
     if (req.body.names.length == 0 && req.body.data != 0) {
         var nameValues = [];
         req.body.data.forEach(function (item) {
@@ -362,8 +393,11 @@ function getFileDetails(req, res, contentRootPath, filterPath) {
         });
         req.body.names = nameValues;
     }
-    var sanitizedPathName = path.normalize(req.body.names[0]).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-    var sanitizedPath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+    if (!validatePathAgainstRoot(contentRootPath, req.body.path)) {
+        return sendAccessDenied(res);
+    }
+    const sanitizedPath = req.body.path;
+    const sanitizedPathName = req.body.names[0];
     if (req.body.names.length == 1) {
         fileDetails(req, res, contentRootPath + (isNamesAvailable ? sanitizedPathName : "")).then(data => {
             if (!data.isFile) {
@@ -402,7 +436,7 @@ function getFileDetails(req, res, contentRootPath, filterPath) {
                     names.push(name);
                 }
             });
-            data.name = names.join(", ");
+            data.name = encodeHtml(names.join(", "));
             data.multipleFiles = true;
             data.size = getSize(size);
             size = 0;
@@ -468,7 +502,7 @@ function updateCopyName(path, name, count, isFile) {
 function checkForFileUpdate(fromPath, toPath, item, contentRootPath, req) {
     var count = 1;
     var name = copyName = item.name;
-    var sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+    var sanitizedTargetPath = req.body.targetPath;
     if (fromPath == toPath) {
         if (checkForDuplicates(contentRootPath + sanitizedTargetPath, name, item.isFile)) {
             updateCopyName(contentRootPath + sanitizedTargetPath, name, count, item.isFile);
@@ -490,19 +524,17 @@ function CopyFiles(req, res, contentRootPath) {
     var fileList = [];
     var replaceFileList = [];
     var permission; var pathPermission; var permissionDenied = false;
+    if (!validatePathAgainstRoot(contentRootPath, req.body.targetPath)) {
+        return sendAccessDenied(res);
+    }
     pathPermission = getPathPermission(req.path, false, req.body.targetData.name, contentRootPath + req.body.targetPath, contentRootPath, req.body.targetData.filterPath);
-    req.body.data.forEach(function (item) {
-        const resolvedPath = path.join(contentRootPath + item.filterPath, item.name);
-        const fullPath = (contentRootPath + item.filterPath + item.name ).replace(/[\\/]/g, "\\");
-        const isValidatePath = fullPath == resolvedPath ? true : false;
-        if(!isValidatePath){
-            var errorMsg = new Error();
-            errorMsg.message = "Access denied for Directory-traversal";
-            errorMsg.code = "401";
-            response = { error: errorMsg };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
+    for (var i = 0; i < req.body.data.length; i++) {
+        var item = req.body.data[i];
+        if (!validatePathAgainstRoot(contentRootPath, item.filterPath + item.name)) {
+            return sendAccessDenied(res);
+        }
+        if (!validatePathAgainstRoot(contentRootPath, req.body.targetPath + item.name)) {
+            return sendAccessDenied(res);
         }
         var fromPath = contentRootPath + item.filterPath;
         permission = getPermission(fromPath, item.name, item.isFile, contentRootPath, item.filterPath);
@@ -521,18 +553,18 @@ function CopyFiles(req, res, contentRootPath) {
             res.setHeader('Content-Type', 'application/json');
             res.json(response);
         }
-    });
+    };
     if (!permissionDenied) {
         const copyPromises = req.body.data.map((item) => {
             return new Promise((resolve, reject) => {
-                const fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
+                const fromPath = path.join(contentRootPath,item.filterPath,item.name);
                 let toPath = contentRootPath + req.body.targetPath + item.name;
                 checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
                 if (!isRenameChecking) {
-                    const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                    const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                    toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
-    
+                    toPath = contentRootPath + req.body.targetPath + copyName;
+                    if (!validatePathAgainstRoot(contentRootPath, req.body.targetPath + copyName)) {
+                        return sendAccessDenied(res);
+                    }
                     if (item.isFile) {
                         // File copy operation using promises
                         fs.copyFile(path.join(fromPath), path.join(toPath), (err) => {
@@ -548,7 +580,7 @@ function CopyFiles(req, res, contentRootPath) {
                             .catch((err) => reject(err));
                     }
                     var list = item;
-                    list.filterPath = sanitizedTargetPath;
+                    list.filterPath = req.body.targetPath;
                     list.name = copyName;
                     fileList.push(list);
                 } else {
@@ -580,7 +612,7 @@ function CopyFiles(req, res, contentRootPath) {
             .catch((err) => {
                 response = { error: err };
                 res.setHeader('Content-Type', 'application/json');
-                res.json(response);
+                return res.json(response);
             });
     }    
 }
@@ -628,19 +660,17 @@ function MoveFiles(req, res, contentRootPath) {
     var fileList = [];
     var replaceFileList = [];
     var permission; var pathPermission; var permissionDenied = false;
+    if (!validatePathAgainstRoot(contentRootPath, req.body.targetPath)) {
+        return sendAccessDenied(res);
+    }
     pathPermission = getPathPermission(req.path, false, req.body.targetData.name, contentRootPath + req.body.targetPath, contentRootPath, req.body.targetData.filterPath);
-    req.body.data.forEach(function (item) {
-        const resolvedPath = path.join(contentRootPath + item.filterPath, item.name);
-        const fullPath = (contentRootPath + item.filterPath + item.name ).replace(/[\\/]/g, "\\");
-        const isValidatePath = fullPath == resolvedPath ? true : false;
-        if(!isValidatePath){
-            var errorMsg = new Error();
-            errorMsg.message = "Access denied for Directory-traversal";
-            errorMsg.code = "401";
-            response = { error: errorMsg };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
+    for (var i = 0; i < req.body.data.length; i++) {
+        var item = req.body.data[i];
+        if (!validatePathAgainstRoot(contentRootPath, item.filterPath + item.name)) {
+            return sendAccessDenied(res);
+        }
+        if (!validatePathAgainstRoot(contentRootPath, req.body.targetPath + item.name)) {
+            return sendAccessDenied(res);
         }
         var fromPath = contentRootPath + item.filterPath;
         permission = getPermission(fromPath, item.name, item.isFile, contentRootPath, item.filterPath);
@@ -659,18 +689,18 @@ function MoveFiles(req, res, contentRootPath) {
             res.setHeader('Content-Type', 'application/json');
             res.json(response);
         }
-    });
+    };
     if (!permissionDenied) {
         const movePromises = req.body.data.map((item) => {
             return new Promise((resolve, reject) => {
-                const fromPath = path.normalize(contentRootPath + item.filterPath + item.name).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                let toPath = contentRootPath + req.body.targetPath + item.name;
+                const fromPath = path.resolve(contentRootPath, (item.filterPath + item.name).replace(/^[\\/]+/, ""));
+                let toPath = path.resolve(contentRootPath, (req.body.targetPath + item.name).replace(/^[\\/]+/, ""));
                 checkForFileUpdate(fromPath, toPath, item, contentRootPath, req);
                 if (!isRenameChecking) {
-                    const sanitizedTargetPath = path.normalize(req.body.targetPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                    const sanitizedTargetName = path.normalize(copyName).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-                    toPath = contentRootPath + sanitizedTargetPath + sanitizedTargetName;
-
+                    if (!validatePathAgainstRoot(contentRootPath, req.body.targetPath + copyName)) {
+                        return sendAccessDenied(res);
+                    }
+                    toPath = path.resolve(contentRootPath, (req.body.targetPath + copyName).replace(/^[\\/]+/, ""));
                     if (item.isFile) {
                         const source = fs.createReadStream(path.join(fromPath));
                         const desti = fs.createWriteStream(path.join(toPath));
@@ -695,7 +725,7 @@ function MoveFiles(req, res, contentRootPath) {
                     }
                     var list = item;
                     list.name = copyName;
-                    list.filterPath = sanitizedTargetPath;
+                    list.filterPath = req.body.targetPath;
                     fileList.push(list);
                 } else {
                     replaceFileList.push(item.name);
@@ -726,7 +756,7 @@ function MoveFiles(req, res, contentRootPath) {
             .catch((err) => {
                 response = { error: err };
                 res.setHeader('Content-Type', 'application/json');
-                res.json(response);
+                return res.json(response);
             });
     }
 }
@@ -833,7 +863,8 @@ function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
         var cwd = {};
         replaceRequestParams(req, res);
         fs.stat(filepath, function (err, stats) {
-            cwd.name = path.basename(filepath);
+            const rawName = path.basename(filepath);
+            cwd.name = encodeHtml(rawName);
             cwd.size = getSize(stats.size);
             cwd.isFile = stats.isFile();
             cwd.dateModified = stats.ctime;
@@ -842,7 +873,7 @@ function FileManagerDirectoryContent(req, res, filepath, searchFilterPath) {
             if (searchFilterPath) {
                 cwd.filterPath = searchFilterPath;
             } else {
-                cwd.filterPath = (req.body.data.length > 0 && req.body.path != "/") ? path.normalize(req.body.data[0].filterPath).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/') : "";
+                cwd.filterPath = (req.body && Array.isArray(req.body.data) && req.body.data.length > 0) ? req.body.path : "";
             }
             cwd.permission = getPathPermission(req.path, cwd.isFile, (req.body.path == "/") ? "" : cwd.name, filepath, contentRootPath, cwd.filterPath);
             if (fs.lstatSync(filepath).isFile()) {
@@ -879,9 +910,12 @@ const multerConfig = {
 
         //specify the filename to be unique
         filename: function (req, file, next) {
-            fileName.push(file.originalname);
-            next(null, file.originalname);
-
+            var safeName = path.basename(file.originalname || "");
+            if (!validateFileName(safeName)) {
+                return next(new Error("Access denied for Directory-traversal"));
+            }
+            fileName.push(safeName);
+            next(null, safeName);
         }
     }),
 
@@ -900,19 +934,9 @@ function replaceRequestParams(req, res) {
  */
 app.get('/GetImage', function (req, res) {
     replaceRequestParams(req, res);
-    const sanitizedPath = path.normalize(req.query.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, "/");
-    var image = sanitizedPath.split("/").length > 1 ? sanitizedPath : "/" + sanitizedPath;
-    const resolvedPath = path.resolve(contentRootPath + image.substr(0, image.lastIndexOf("/")), image.substr(image.lastIndexOf("/") + 1, image.length - 1));
-    const fullPath = (contentRootPath + image).replace(/[\\/]/g, "\\");
-    const isValidatePath = fullPath == resolvedPath ? true : false;
-    if(!isValidatePath){
-        var errorMsg = new Error();
-        errorMsg.message = "Access denied for Directory-traversal";
-        errorMsg.code = "401";
-        response = { error: errorMsg };
-        response = JSON.stringify(response);
-        res.setHeader('Content-Type', 'application/json');
-        res.json(response);
+    var image = req.query.path;
+    if (!validatePathAgainstRoot(contentRootPath, image)) {
+        return sendAccessDenied(res);
     }
     var pathPermission = getPermission(contentRootPath + image.substr(0, image.lastIndexOf("/")), image.substr(image.lastIndexOf("/") + 1, image.length - 1), true, contentRootPath, image.substr(0, image.lastIndexOf("/")));
     if (pathPermission != null && !pathPermission.read) {
@@ -937,22 +961,14 @@ app.get('/GetImage', function (req, res) {
  */
 app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res) {
     replaceRequestParams(req, res);
-    const checkTraversalPath = path.resolve(contentRootPath + req.body.path).replace(/[\\/]/g, "\\\\")+"\\\\";
-    const actualPath = (contentRootPath + req.body.path).replace(/\//g, "\\\\");
-    const isPathTraversal = checkTraversalPath == actualPath ? true : false;
+    const isPathTraversal = validatePathAgainstRoot(contentRootPath, req.body.path);
     if(!isPathTraversal){
-        var errorMsg = new Error();
-        errorMsg.message = "Access denied for Directory-traversal";
-        errorMsg.code = "401";
-        response = { error: errorMsg };
-        response = JSON.stringify(response);
-        res.setHeader('Content-Type', 'application/json');
-        res.json(response);
+        return sendAccessDenied(res);
     }
     var pathPermission = req.body.data != null ? getPathPermission(req.path, true, JSON.parse(req.body.data).name, contentRootPath + req.body.path, contentRootPath, JSON.parse(req.body.data).filterPath) : null;
     if (pathPermission != null && (!pathPermission.read || !pathPermission.upload)) {
         var errorMsg = new Error();
-        errorMsg.message = (permission.message !== "") ? permission.message :
+        errorMsg.message = (pathPermission.message !== "") ? pathPermission.message :
             JSON.parse(req.body.data).name + " is not accessible. You need permission to perform the upload action.";
         errorMsg.code = "401";
         response = { error: errorMsg };
@@ -960,31 +976,25 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
         res.setHeader('Content-Type', 'application/json');
         res.json(response);
     }
-
     if (req.body != null && req.body.path != null) {
         var errorValue = new Error();
         var existFiles = [];
-
         if (req.body.action === 'save' || req.body.action === 'keepboth' || req.body.action === 'replace') {
-            var folders = (path.normalize(req.body.filename).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, "/")).split('/');
-            var filepath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, "/");
+            var folders = (req.body.filename || "").split('/');
+            var filepath = req.body.path || "/";
             var uploadedFileName = folders[folders.length - 1];
+            if (!validateFileName(uploadedFileName)) {
+                return sendAccessDenied(res);
+            }
             // checking the folder upload
             if (folders.length > 1)
             {
                 for (var i = 0; i < folders.length - 1; i++)
                 {
                     var newDirectoryPath = path.join(contentRootPath + filepath, folders[i]);
-                    const fullPath = (contentRootPath + filepath + folders[i]).replace(/[\\/]/g, "\\");
-                    const isValidatePath = fullPath == newDirectoryPath ? true : false;
+                    const isValidatePath = validatePathAgainstRoot(contentRootPath, filepath + folders[i]);
                     if(!isValidatePath){
-                        var errorMsg = new Error();
-                        errorMsg.message = "Access denied for Directory-traversal";
-                        errorMsg.code = "401";
-                        response = { error: errorMsg };
-                        response = JSON.stringify(response);
-                        res.setHeader('Content-Type', 'application/json');
-                        res.json(response);
+                        return sendAccessDenied(res);
                     }
                     if (!fs.existsSync(newDirectoryPath)) {
                         fs.mkdirSync(newDirectoryPath);
@@ -992,18 +1002,22 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
                     filepath += folders[i] + "/";
                 }
             }
-
             const fullFilePath = path.join(contentRootPath, filepath + uploadedFileName);
-
             if (req.body.action === 'save') {
                 if (fs.existsSync(fullFilePath)) {
                     existFiles.push(fullFilePath);
                 } else {
+                    if (!validatePathAgainstRoot(contentRootPath, filepath + uploadedFileName)) {
+                        return sendAccessDenied(res);
+                    }
                     fs.renameSync('./' + uploadedFileName, fullFilePath);
                 }
             } else if (req.body.action === 'replace') {
                 if (fs.existsSync(fullFilePath)) {
                     fs.unlinkSync(fullFilePath);
+                }
+                if (!validatePathAgainstRoot(contentRootPath, filepath + uploadedFileName)) {
+                    return sendAccessDenied(res);
                 }
                 fs.renameSync('./' + uploadedFileName, fullFilePath);
             } else if (req.body.action === 'keepboth') {
@@ -1014,16 +1028,22 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
                     const parsedPath = path.parse(fullFilePath);
                     newName = path.join(parsedPath.dir, `${parsedPath.name}(${fileCount})${parsedPath.ext}`);
                 }
+                if (!validatePathAgainstRoot(contentRootPath, filepath + uploadedFileName)) {
+                    return sendAccessDenied(res);
+                }
                 fs.renameSync('./' + uploadedFileName, newName);
             }
-        } else if (req.body.action === 'remove') {
-            const normalizedPath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-            const cancelUploadValue = path.normalize(req.body['cancel-upload']).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-            if (fs.existsSync(path.join(contentRootPath, normalizedPath + cancelUploadValue))) {
-                fs.unlinkSync(path.join(contentRootPath, normalizedPath + cancelUploadValue));
+        } else if (req.body.action === 'remove') {      
+            const cancelUpload = String(req.body['cancel-upload'] || '').replace(/\\/g, '/');
+            const removeTarget = path.posix.join(String(req.body.path || ''), cancelUpload);
+            if (!validatePathAgainstRoot(contentRootPath, removeTarget)) {
+                return sendAccessDenied(res);
+            }
+            const absRemovePath = path.resolve(contentRootPath, removeTarget.replace(/^[/\\]+/, ''));
+            if (fs.existsSync(absRemovePath)) {
+                fs.unlinkSync(absRemovePath);
             }
         }
-
         if (existFiles.length > 0) {
             errorValue.message = "File already exists.";
             errorValue.code = "400";
@@ -1045,18 +1065,20 @@ app.post('/Download', function (req, res) {
     replaceRequestParams(req, res);
     var downloadObj = JSON.parse(req.body.downloadInput);
     var permission; var permissionDenied = false;
-    downloadObj.data.forEach(function (item) {
-        const resolvedPath = path.join(contentRootPath + item.filterPath, item.name);
-        const fullPath = (contentRootPath + item.filterPath + item.name).replace(/\//g, "\\");
-        const isValidatePath = fullPath == resolvedPath ? true : false;
-        if(!isValidatePath){
-            var errorMsg = new Error();
-            errorMsg.message = "Access denied for Directory-traversal";
-            errorMsg.code = "401";
-            response = { error: errorMsg };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
+    var basePath = (downloadObj.path || "").replace(/^[\\/]+/, "");
+    if (downloadObj.names && downloadObj.names.length) {
+        for (var n = 0; n < downloadObj.names.length; n++) {
+            var relNamePath = path.posix.join(basePath, downloadObj.names[n]);
+            if (!validatePathAgainstRoot(contentRootPath, relNamePath)) {
+                return sendAccessDenied(res);
+            }
+        }
+    }
+    for (var i = 0; i < downloadObj.data.length; i++) {
+        var item = downloadObj.data[i];
+        var relItemPath = path.posix.join((item.filterPath || "").replace(/^[\\/]+/, ""), item.name);
+        if (!validatePathAgainstRoot(contentRootPath, relItemPath)) {
+            return sendAccessDenied(res);
         }
         var filepath = (contentRootPath + item.filterPath).replace(/\\/g, "/");
         permission = getPermission(filepath + item.name, item.name, item.isFile, contentRootPath, item.filterPath);
@@ -1070,11 +1092,15 @@ app.post('/Download', function (req, res) {
             res.setHeader('Content-Type', 'application/json');
             res.json(response);
         }
-    });
+    };
     if (!permissionDenied) {
         if (downloadObj.names.length === 1 && downloadObj.data[0].isFile) {
-            var file = contentRootPath + downloadObj.path + downloadObj.names[0];
-            res.download(file);
+            var safeRelativeFile = path.posix.join(basePath, downloadObj.names[0]);
+            if (!validatePathAgainstRoot(contentRootPath, safeRelativeFile)) {
+                return sendAccessDenied(res);
+            }
+            var file = path.resolve(contentRootPath, safeRelativeFile);
+            return res.download(file);
         } else {
             var archive = archiver('zip', {
                 gzip: true,
@@ -1085,11 +1111,19 @@ app.post('/Download', function (req, res) {
                 archive.on('error', function (err) {
                     throw err;
                 });
+                const relZipPath = path.posix.join(
+                    (item.filterPath || "").replace(/^[\\/]+/, ""),
+                    item.name
+                );
+                if (!validatePathAgainstRoot(contentRootPath, relZipPath)) {
+                    return sendAccessDenied(res);
+                }
+                const absZipPath = path.resolve(contentRootPath, relZipPath);
                 if (item.isFile) {
-                    archive.file(contentRootPath + item.filterPath + item.name, { name: item.name });
+                    archive.file(absZipPath, { name: item.name });
                 }
                 else {
-                    archive.directory(contentRootPath + item.filterPath + item.name + "/", item.name);
+                    archive.directory(absZipPath, { name: item.name });
                 }
             });
             archive.pipe(output);
@@ -1140,8 +1174,10 @@ app.post('/', function (req, res) {
 
     // Action for getDetails
     if (req.body.action == "details") {
-        var sanitizedPath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-        getFileDetails(req, res, contentRootPath + sanitizedPath, req.body.data[0].filterPath);
+        if (!validatePathAgainstRoot(contentRootPath, req.body.path)) {
+            return sendAccessDenied(res);
+        }
+        return getFileDetails(req, res, contentRootPath + req.body.path, req.body.data[0].filterPath);
     }
     // Action for copying files
     if (req.body.action == "copy") {
@@ -1167,15 +1203,16 @@ app.post('/', function (req, res) {
     function addSearchList(filename, contentRootPath, fileList, files, index) {
         var cwd = {};
         var stats = fs.statSync(filename);
-        cwd.name = path.basename(filename);
+        var rawName = path.basename(filename);
+        cwd.name = encodeHtml(rawName);
         cwd.size = stats.size;
         cwd.isFile = stats.isFile();
         cwd.dateModified = stats.mtime;
         cwd.dateCreated = stats.ctime;
         cwd.type = path.extname(filename);
         cwd.filterPath = filename.substr((contentRootPath.length), filename.length).replace(files[index], "");
-        cwd.permission = getPermission(filename.replace(/\\/g, "/"), cwd.name, cwd.isFile, contentRootPath, cwd.filterPath);
-        var permission = parentsHavePermission(filename, contentRootPath, cwd.isFile, cwd.name, cwd.filterPath);
+        cwd.permission = getPermission(filename.replace(/\\/g, "/"), rawName, cwd.isFile, contentRootPath, cwd.filterPath);
+        var permission = parentsHavePermission(filename, contentRootPath, cwd.isFile, rawName, cwd.filterPath);
         if (permission) {
             if (fs.lstatSync(filename).isFile()) {
                 cwd.hasChild = false;
@@ -1249,26 +1286,18 @@ app.post('/', function (req, res) {
 
     // Action to search a file
     if (req.body.action === 'search') {
-        const resolvedPath = path.resolve(contentRootPath + req.body.path).replace(/[\\/]/g, "\\\\")+"\\\\";
-        const fullPath = (contentRootPath + req.body.path).replace(/\//g, "\\\\");
-        const isValidatePath = fullPath == resolvedPath ? true : false;
+        const isValidatePath = validatePathAgainstRoot(contentRootPath, req.body.path);
         if(!isValidatePath){
-            var errorMsg = new Error();
-            errorMsg.message = "Access denied for Directory-traversal";
-            errorMsg.code = "401";
-            response = { error: errorMsg };
-            response = JSON.stringify(response);
-            res.setHeader('Content-Type', 'application/json');
-            res.json(response);
+            return sendAccessDenied(res);
         }
         var fileList = [];
-        const sanitizedPath = path.resolve(contentRootPath + path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/')).replace(/\\/g, '/') + '/';
+        const sanitizedPath = path.join(contentRootPath, req.body.path);
         fromDir(sanitizedPath, req.body.searchString.replace(/\*/g, ""), contentRootPath, req.body.caseSensitive, req.body.searchString);
         (async () => {
             const tes = await FileManagerDirectoryContent(req, res, contentRootPath + path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/'));
             if (tes.permission != null && !tes.permission.read) {
                 var errorMsg = new Error();
-                errorMsg.message = (permission.message !== "") ? permission.message :
+                errorMsg.message = (tes.permission.message !== "") ? tes.permission.message :
                     "'" + getFileName(contentRootPath + (req.body.path.substring(0, req.body.path.length - 1))) + "' is not accessible. You need permission to perform the read action.";
                 errorMsg.code = "401";
                 response = { error: errorMsg };
@@ -1293,14 +1322,15 @@ app.post('/', function (req, res) {
                     if (err) {
                         return reject(err);
                     }
-                    cwd.name = path.basename(contentRootPath + req.body.path + file);
+                    var rawName = path.basename(contentRootPath + req.body.path + file);
+                    cwd.name = encodeHtml(rawName);
                     cwd.size = (cwd.size);
                     cwd.isFile = cwd.isFile();
                     cwd.dateModified = cwd.ctime;
                     cwd.dateCreated = cwd.mtime;
                     cwd.filterPath = getRelativePath(contentRootPath, contentRootPath + req.body.path, req);
                     cwd.type = path.extname(contentRootPath + req.body.path + file);
-                    cwd.permission = getPermission(contentRootPath + req.body.path + cwd.name, cwd.name, cwd.isFile, contentRootPath, cwd.filterPath);
+                    cwd.permission = getPermission(contentRootPath + req.body.path + rawName, rawName, cwd.isFile, contentRootPath, cwd.filterPath);
                     if (fs.lstatSync(file).isDirectory()) {
                         fs.readdirSync(file).forEach(function (items) {
                             if (fs.statSync(path.join(file, items)).isDirectory()) {
@@ -1333,24 +1363,15 @@ app.post('/', function (req, res) {
     // Action to read a file
     if (req.body.action == "read") {
         (async () => {
-            const resolvedPath = path.resolve(contentRootPath + req.body.path).replace(/[\\/]/g, "\\\\")+"\\\\";
-            const fullPath = (contentRootPath + req.body.path).replace(/\//g, "\\\\");
-            const isValidatePath = fullPath == resolvedPath ? true : false;
-            const filesList = await GetFiles(req, res);
-            const sanitizedPath = path.normalize(req.body.path).replace(/^(\.\.[\/\\])+/, '').replace(/\\/g, '/');
-            const cwdFiles = await FileManagerDirectoryContent(req, res, contentRootPath + sanitizedPath);
-            cwdFiles.name = req.body.path == "/" ? rootName = (path.basename(contentRootPath + sanitizedPath)) : path.basename(contentRootPath + sanitizedPath)
             var response = {};
+            const isValidatePath = validatePathAgainstRoot(contentRootPath, req.body.path);
             if(!isValidatePath)
             {
-                var errorMsg = new Error();
-                errorMsg.message = "Access denied for Directory-traversal.";
-                errorMsg.code = "401";
-                response = { cwd: cwdFiles, files: null, error: errorMsg };
-                response = JSON.stringify(response);
-                res.setHeader('Content-Type', 'application/json');
-                res.json(response);
+                return sendAccessDenied(res);
             }
+            const filesList = await GetFiles(req, res);
+            const cwdFiles = await FileManagerDirectoryContent(req, res, contentRootPath + req.body.path);
+            cwdFiles.name = req.body.path == "/" ? rootName = encodeHtml((path.basename(contentRootPath + req.body.path))) : encodeHtml(path.basename(contentRootPath + req.body.path))
             if (cwdFiles.permission != null && !cwdFiles.permission.read) {
                 var errorMsg = new Error();
                 errorMsg.message = (cwdFiles.permission.message !== "") ? cwdFiles.permission.message :
