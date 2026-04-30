@@ -1,6 +1,12 @@
 # NodeJS file system providers for Essential JS 2 File Manager 
 
-This repository contains the nodeJS file system provider used for Essential JS 2 File Manager component.
+**Repository Description**  
+This repository contains the **Node.js file system provider** used for the Syncfusion **Essential JS 2 File Manager** component. The provider exposes server‑side APIs that allow the File Manager to interact with the physical file system and perform standard file operations.
+
+The Node.js provider enables secure and extensible backend support for file browsing, management, and access control in JavaScript‑based File Manager applications.
+
+## Project Overview
+The purpose of this project is to provide a Node.js server implementation that supports file system operations required by the Syncfusion Essential JS 2 File Manager. It demonstrates how client‑side File Manager requests are handled by a Node.js service to perform actions such as reading files, uploading content, and managing folders.
 
 ## Key Features
 
@@ -57,54 +63,46 @@ For Example
     ]
 }
 ```
+## Prerequisites
+Ensure the following requirements are met before running this project:
+- Node.js (LTS recommended)  
+- npm package manager  
+- Basic knowledge of JavaScript and Node.js  
+- Syncfusion Essential JS 2 File Manager setup  
 
+## Installation
 
-## How to configure a web service
+### Install the Node.js File System Provider
+Install the Node.js file system provider package using npm:
 
-Follow the below set of commands to configure the nodeJS file system providers. 
-
-- To install ej2-filemanager-node-filesystem package, use the following command.
-
-```sh
- 
-  npm install @syncfusion/ej2-filemanager-node-filesystem
-
+```bash
+npm install @syncfusion/ej2-filemanager-node-filesystem
 ```
-
-- To install the depend packages for the file system provider, navigate to @syncfusion/ej2-filemanager-node-filesystem folder within the node_modules and run the below command 
-
-```sh
- 
-  npm install
-
+### Install Dependencies
+Navigate to the provider directory inside node_modules and install required dependencies:
+```bash
+npm install
 ```
-
-* Now, run the below command line to check the Node API service in local and will be started in `http://localhost:8090/`. By default the nodeJS directory service is configured with `C:/Users`. 
-
-### To configure the directory
-
-* To change the directory use flag `-d` like this `-d D:/Projects`
- 
-### To configure the port
-
-* To change the port use like this `set PORT=3000`
-
-For example: 
-
-```sh
+### Running the Service
+To start the Node.js file system service, run:
+```bash
+npm start
+```
+By default, the service runs at:`http://localhost:8090/`
+### Configure the Directory
+To change the root directory, use the -d flag:
+```bash
+node filesystem-server.js -d D:/Projects
+```
+### Configure the Port
+To change the port number:
+```bash
 set PORT=3000 && node filesystem-server.js -d D:/Projects
 ```
 
-### start the service
+## Usage
 
-To start the service use this command,
-
-```sh
-npm start
-```
-
-## File Manager AjaxSettings
-
+### File Manager AjaxSettings
 To access the basic actions like Read, Delete, Copy, Move, Rename, Search, and Get Details of File Manager using NodeJS file system service, just map the following code snippet in the Ajaxsettings property of File Manager.
 
 Here, the `hostUrl` will be your locally hosted port number.
@@ -115,11 +113,8 @@ Here, the `hostUrl` will be your locally hosted port number.
             url: hostUrl,
         }
 ```
-
-## File download AjaxSettings
-
+### File download AjaxSettings
 To perform download operation, initialize the `downloadUrl` property in ajaxSettings of the File Manager component.
-
 ```
   var hostUrl = http://localhost:8090/;
   ajaxSettings: {
@@ -127,11 +122,8 @@ To perform download operation, initialize the `downloadUrl` property in ajaxSett
             downloadUrl: hostUrl + 'Download'
         },
 ```
-
-## File upload AjaxSettings
-
+### File upload AjaxSettings
 To perform upload operation, initialize the `uploadUrl` property in ajaxSettings of the File Manager component.
-
 ```
   var hostUrl = http://localhost:8090/;
   ajaxSettings: {
@@ -139,11 +131,8 @@ To perform upload operation, initialize the `uploadUrl` property in ajaxSettings
             uploadUrl: hostUrl + 'Upload'
         },
 ```
-
-## File image preview AjaxSettings
-
+### File image preview AjaxSettings
 To perform image preview support in the File Manager component, initialize the `getImageUrl` property in ajaxSettings of the File Manager component.
-
 ```
   var hostUrl = http://localhost:8090/;
   ajaxSettings: {
@@ -151,10 +140,27 @@ To perform image preview support in the File Manager component, initialize the `
             getImageUrl: hostUrl + 'GetImage'
         },
 ```
-
 The FileManager will be rendered as follows.
 
 ![File Manager](https://ej2.syncfusion.com/products/images/file-manager/readme.gif)
+
+## Documentation
+- General Syncfusion documentation:
+https://help.syncfusion.com/
+- JavaScript Introduction (Essential JS 2):
+https://ej2.syncfusion.com/javascript/documentation/introduction
+- JavaScript File Manager – Getting Started (ES5):
+https://ej2.syncfusion.com/javascript/documentation/file-manager/es5-getting-started
+
+## Additional Resources
+- Syncfusion JavaScript File Manager overview:
+https://www.syncfusion.com/javascript-ui-controls/js-file-manager
+
+## Troubleshooting
+- Ensure the Node.js service is running and accessible.
+- Verify the configured port and directory path.
+- Check file system permissions for read/write access.
+- Restart the service after configuration updates.
 
 ## Support
 
