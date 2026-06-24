@@ -1,12 +1,12 @@
 # NodeJS file system providers for Essential JS 2 File Manager 
 
 **Repository Description**  
-This repository contains the **Node.js file system provider** used for the Syncfusion **Essential JS 2 File Manager** component. The provider exposes server‑side APIs that allow the File Manager to interact with the physical file system and perform standard file operations.
+This repository contains the **Node.js file system provider** used for the **Essential JS 2 File Manager** component. The provider exposes server‑side APIs that allow the File Manager to interact with the physical file system and perform standard file operations.
 
 The Node.js provider enables secure and extensible backend support for file browsing, management, and access control in JavaScript‑based File Manager applications.
 
 ## Project Overview
-The purpose of this project is to provide a Node.js server implementation that supports file system operations required by the Syncfusion Essential JS 2 File Manager. It demonstrates how client‑side File Manager requests are handled by a Node.js service to perform actions such as reading files, uploading content, and managing folders.
+The purpose of this project is to provide a Node.js server implementation that supports file system operations required by the Essential JS 2 File Manager. It demonstrates how client‑side File Manager requests are handled by a Node.js service to perform actions such as reading files, uploading content, and managing folders.
 
 ## Key Features
 
@@ -68,7 +68,7 @@ Ensure the following requirements are met before running this project:
 - Node.js (LTS recommended)  
 - npm package manager  
 - Basic knowledge of JavaScript and Node.js  
-- Syncfusion Essential JS 2 File Manager setup  
+- Essential JS 2 File Manager setup  
 
 ## Installation
 
@@ -153,7 +153,7 @@ https://ej2.syncfusion.com/javascript/documentation/introduction
 https://ej2.syncfusion.com/javascript/documentation/file-manager/es5-getting-started
 
 ## Additional Resources
-- Syncfusion JavaScript File Manager overview:
+- JavaScript File Manager overview:
 https://www.syncfusion.com/javascript-ui-controls/js-file-manager
 
 ## Troubleshooting
